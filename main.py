@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -72,10 +72,12 @@ def find_all_matches(block, full_data):
         })
     return matches
 
+# ✅ HTML 출력용 라우트 (index.html)
 @app.route("/")
 def home():
-    return send_file("index.html")
+    return send_from_directory(os.path.dirname(__file__), "index.html")
 
+# ✅ 예측 결과 API
 @app.route("/predict")
 def predict():
     try:
@@ -115,6 +117,7 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e)})
 
+# ✅ 포트 실행 (환경변수 우선, 기본 5000)
 if __name__ == '__main__':
     port = int(os.environ.get("PORT") or 5000)
     app.run(host='0.0.0.0', port=port)
