@@ -72,9 +72,12 @@ def find_all_matches(block, full_data):
         })
     return matches
 
-# ✅ HTML 출력용 라우트 (index.html)
+# ✅ HTML 출력 라우트 (디버깅 로그 포함)
 @app.route("/")
 def home():
+    print("[✅ 디버그] / 요청 감지됨")
+    path = os.path.join(os.path.dirname(__file__), "index.html")
+    print(f"[📄 경로] index.html 절대 경로: {path}")
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
 # ✅ 예측 결과 API
