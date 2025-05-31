@@ -61,8 +61,8 @@ def find_all_matches(block, full_data):
     if not matches:
         matches.append({
             "값": "❌ 없음",
-            "블럭": "❌ 없음",
-            "순번": "없음"
+            "블럭": ">".join(block),
+            "순번": "❌"
         })
     return matches
 
@@ -78,7 +78,7 @@ def predict():
         mode = request.args.get("mode", "3block_orig")
         size = int(mode[0])
 
-        # ✅ 최신순 정렬: reg_date + date_round 기준
+        # ✅ Supabase에서 최신 3000줄 분석
         response = supabase.table(SUPABASE_TABLE) \
             .select("*") \
             .order("reg_date", desc=True) \
@@ -86,10 +86,12 @@ def predict():
             .limit(3000) \
             .execute()
 
-        raw = response.data  # 최신순 유지
-        print("[📦 Supabase 첫 줄]", raw[0])  # 디버깅용 출력
+        raw = response.data
+        print("[📦 Supabase 첫 줄]", raw[0])  # 디버깅 출력
 
-        round_num = int(raw[0]["date_round"]) + 1
+        # 예측 회차는 가장 높은 date_round 기준
+        round_num = max(int(row["date_round"]) for row in raw) + 1
+
         all_data = [convert(d) for d in raw]
         recent_flow = all_data[:size]
 
@@ -103,6 +105,12 @@ def predict():
             flow = recent_flow
 
         matches = find_all_matches(flow, all_data)
+
+        # ✅ 매칭 결과를 "순번" 기준으로 정렬하여 최신순 Top 5만 추출
+        matches = sorted(
+            matches,
+            key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999
+        )[:5]
 
         return jsonify({
             "예측회차": round_num,
