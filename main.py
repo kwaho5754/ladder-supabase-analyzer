@@ -78,7 +78,7 @@ def predict():
         mode = request.args.get("mode", "3block_orig")
         size = int(mode[0])
 
-        # ✅ Supabase에서 최신 3000줄 분석
+        # Supabase에서 최신 3000줄 분석
         response = supabase.table(SUPABASE_TABLE) \
             .select("*") \
             .order("reg_date", desc=True) \
@@ -89,7 +89,7 @@ def predict():
         raw = response.data
         print("[📦 Supabase 첫 줄]", raw[0])  # 디버깅 출력
 
-        # 예측 회차는 가장 높은 date_round 기준
+        # ✅ 최대 회차 +1 방식으로 예측 회차 결정
         round_num = max(int(row["date_round"]) for row in raw) + 1
 
         all_data = [convert(d) for d in raw]
@@ -106,7 +106,7 @@ def predict():
 
         matches = find_all_matches(flow, all_data)
 
-        # ✅ 매칭 결과를 "순번" 기준으로 정렬하여 최신순 Top 5만 추출
+        # 순번 기준 최신순으로 정렬 후 상위 5개만 추출
         matches = sorted(
             matches,
             key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999
