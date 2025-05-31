@@ -89,8 +89,8 @@ def predict():
         raw = response.data
         print("[📦 Supabase 첫 줄]", raw[0])  # 디버깅 출력
 
-        # ✅ 최대 회차 +1 방식으로 예측 회차 결정
-        round_num = max(int(row["date_round"]) for row in raw) + 1
+        # ✅ 가장 최신 줄의 회차값 기준으로 예측 회차 계산
+        round_num = int(raw[0]["date_round"]) + 1
 
         all_data = [convert(d) for d in raw]
         recent_flow = all_data[:size]
@@ -106,7 +106,7 @@ def predict():
 
         matches = find_all_matches(flow, all_data)
 
-        # 순번 기준 최신순으로 정렬 후 상위 5개만 추출
+        # ✅ 순번 기준 최신순으로 정렬 후 상위 5개만 출력
         matches = sorted(
             matches,
             key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999
