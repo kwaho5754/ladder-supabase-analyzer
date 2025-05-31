@@ -4,27 +4,26 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
 
-# ✅ .env 파일 로드
+# .env 환경변수 로드
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# 🔐 환경변수에서 Supabase 정보 불러오기
+# Supabase 연결 정보
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 SUPABASE_TABLE = os.environ.get("SUPABASE_TABLE", "ladder")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 🔁 사다리 결과 문자열로 변환
+# 사다리 결과값 변환
 def convert(entry):
     side = '좌' if entry['start_point'] == 'LEFT' else '우'
     count = str(entry['line_count'])
     oe = '짝' if entry['odd_even'] == 'EVEN' else '홀'
     return f"{side}{count}{oe}"
 
-# 블럭 파싱 및 변형 함수들
 def parse_block(s):
     return s[0], s[1:-1], s[-1]
 
@@ -35,22 +34,17 @@ def flip_full(block):
     ]
 
 def flip_start(block):
-    flipped = []
-    for s, c, o in map(parse_block, block):
-        c_flip = '4' if c == '3' else '3'
-        o_flip = '홀' if o == '짝' else '짝'
-        flipped.append(s + c_flip + o_flip)
-    return flipped
+    return [
+        s + ('4' if c == '3' else '3') + ('홀' if o == '짝' else '짝')
+        for s, c, o in map(parse_block, block)
+    ]
 
 def flip_odd_even(block):
-    flipped = []
-    for s, c, o in map(parse_block, block):
-        s_flip = '우' if s == '좌' else '좌'
-        c_flip = '4' if c == '3' else '3'
-        flipped.append(s_flip + c_flip + o)
-    return flipped
+    return [
+        ('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o
+        for s, c, o in map(parse_block, block)
+    ]
 
-# 블럭 매칭
 def find_all_matches(block, full_data):
     matches = []
     block_len = len(block)
@@ -72,35 +66,32 @@ def find_all_matches(block, full_data):
         })
     return matches
 
-# ✅ HTML 출력 라우트 (디버깅 로그 포함)
+# index.html 반환
 @app.route("/")
 def home():
-    print("[✅ 디버그] / 요청 감지됨")
-    path = os.path.join(os.path.dirname(__file__), "index.html")
-    print(f"[📄 경로] index.html 절대 경로: {path}")
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
-# ✅ 예측 결과 API
+# 예측 API
 @app.route("/predict")
 def predict():
     try:
         mode = request.args.get("mode", "3block_orig")
         size = int(mode[0])
 
-        # ✅ Supabase에서 최신 3000줄 가져오기
+        # 🔧 최신 회차 기준 정렬 (date_round만 사용)
         response = supabase.table(SUPABASE_TABLE) \
             .select("*") \
-            .order("reg_date", desc=True) \
             .order("date_round", desc=True) \
             .limit(3000) \
             .execute()
 
-        raw = list(reversed(response.data))  # 최신순 → 오래된순
+        raw = list(reversed(response.data))
+        print("[📦 Supabase 첫 줄]", raw[0])  # 🔍 디버깅용 출력
+
         round_num = int(raw[0]["date_round"]) + 1
         all_data = [convert(d) for d in raw]
         recent_flow = all_data[:size]
 
-        # 블럭 변형 적용
         if "flip_full" in mode:
             flow = flip_full(recent_flow)
         elif "flip_start" in mode:
@@ -120,7 +111,7 @@ def predict():
     except Exception as e:
         return jsonify({"error": str(e)})
 
-# ✅ 포트 실행 (환경변수 우선, 기본 5000)
+# 실행
 if __name__ == '__main__':
     port = int(os.environ.get("PORT") or 5000)
     app.run(host='0.0.0.0', port=port)
