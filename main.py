@@ -78,14 +78,14 @@ def predict():
         mode = request.args.get("mode", "3block_orig")
         size = int(mode[0])
 
-        # 🔧 최신 회차 기준 정렬 (date_round만 사용)
+        # 🔧 최신 회차 기준 정렬 (reversed 제거)
         response = supabase.table(SUPABASE_TABLE) \
             .select("*") \
             .order("date_round", desc=True) \
             .limit(3000) \
             .execute()
 
-        raw = list(reversed(response.data))
+        raw = response.data  # ✅ 최신순 유지
         print("[📦 Supabase 첫 줄]", raw[0])  # 🔍 디버깅용 출력
 
         round_num = int(raw[0]["date_round"]) + 1
