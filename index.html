@@ -40,17 +40,24 @@
   </style>
 </head>
 <body>
-  <h1>사다리 예측 시스템 (상단/하단 기준)</h1>
+  <h1>사다리 예측 시스템 (3~5줄 상단/하단)</h1>
   <div id="round">예측 회차: 로딩 중...</div>
 
   <div class="section">
-    <h2>📌 상단 기준 결과</h2>
-    <div id="above" class="result-block"></div>
-  </div>
+    <h2>📌 3줄 블럭 - 상단</h2>
+    <div id="block3_above" class="result-block"></div>
+    <h2>📌 3줄 블럭 - 하단</h2>
+    <div id="block3_below" class="result-block"></div>
 
-  <div class="section">
-    <h2>📌 하단 기준 결과</h2>
-    <div id="below" class="result-block"></div>
+    <h2>📌 4줄 블럭 - 상단</h2>
+    <div id="block4_above" class="result-block"></div>
+    <h2>📌 4줄 블럭 - 하단</h2>
+    <div id="block4_below" class="result-block"></div>
+
+    <h2>📌 5줄 블럭 - 상단</h2>
+    <div id="block5_above" class="result-block"></div>
+    <h2>📌 5줄 블럭 - 하단</h2>
+    <div id="block5_below" class="result-block"></div>
   </div>
 
   <script>
@@ -70,11 +77,12 @@
           return div;
         };
 
-        const above = document.getElementById("above");
-        const below = document.getElementById("below");
-
-        data["상단기준"].forEach(item => above.appendChild(makeCard(item)));
-        data["하단기준"].forEach(item => below.appendChild(makeCard(item)));
+        [3, 4, 5].forEach(size => {
+          const top = document.getElementById(`block${size}_above`);
+          const bottom = document.getElementById(`block${size}_below`);
+          data[`${size}줄_상단`].forEach(item => top.appendChild(makeCard(item)));
+          data[`${size}줄_하단`].forEach(item => bottom.appendChild(makeCard(item)));
+        });
       });
   </script>
 </body>

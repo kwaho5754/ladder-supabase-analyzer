@@ -21,27 +21,6 @@ def convert(entry):
     oe = '짝' if entry['odd_even'] == 'EVEN' else '홀'
     return f"{side}{count}{oe}"
 
-def parse_block(s):
-    return s[0], s[1:-1], s[-1]
-
-def flip_full(block):
-    return [
-        ('우' if s == '좌' else '좌') + c + ('짝' if o == '홀' else '홀')
-        for s, c, o in map(parse_block, block)
-    ]
-
-def flip_start(block):
-    return [
-        s + ('4' if c == '3' else '3') + ('홀' if o == '짝' else '짝')
-        for s, c, o in map(parse_block, block)
-    ]
-
-def flip_odd_even(block):
-    return [
-        ('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o
-        for s, c, o in map(parse_block, block)
-    ]
-
 def find_all_matches(block, full_data, mode="above"):
     matches = []
     block_len = len(block)
@@ -76,9 +55,6 @@ def home():
 @app.route("/predict")
 def predict():
     try:
-        mode = request.args.get("mode", "3block_orig")
-        size = int(mode[0])
-
         response = supabase.table(SUPABASE_TABLE) \
             .select("*") \
             .order("reg_date", desc=True) \
@@ -90,30 +66,16 @@ def predict():
         print("[📦 Supabase 첫 줄]", raw[0])
 
         round_num = int(raw[0]["date_round"]) + 1
-
         all_data = [convert(d) for d in raw]
-        recent_flow = all_data[:size]
 
-        if "flip_full" in mode:
-            flow = flip_full(recent_flow)
-        elif "flip_start" in mode:
-            flow = flip_start(recent_flow)
-        elif "flip_odd_even" in mode:
-            flow = flip_odd_even(recent_flow)
-        else:
-            flow = recent_flow
+        result = {"예측회차": round_num}
 
-        matches_above = find_all_matches(flow, all_data, mode="above")
-        matches_below = find_all_matches(flow, all_data, mode="below")
+        for size in [3, 4, 5]:
+            recent_block = all_data[:size]
+            result[f"{size}줄_상단"] = find_all_matches(recent_block, all_data, mode="above")[:5]
+            result[f"{size}줄_하단"] = find_all_matches(recent_block, all_data, mode="below")[:5]
 
-        matches_above = sorted(matches_above, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
-        matches_below = sorted(matches_below, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
-
-        return jsonify({
-            "예측회차": round_num,
-            "상단기준": matches_above,
-            "하단기준": matches_below
-        })
+        return jsonify(result)
 
     except Exception as e:
         return jsonify({"error": str(e)})
