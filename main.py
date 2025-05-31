@@ -4,20 +4,17 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
 
-# .env 환경변수 로드
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Supabase 연결 정보
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 SUPABASE_TABLE = os.environ.get("SUPABASE_TABLE", "ladder")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 사다리 결과값 변환
 def convert(entry):
     side = '좌' if entry['start_point'] == 'LEFT' else '우'
     count = str(entry['line_count'])
@@ -45,14 +42,20 @@ def flip_odd_even(block):
         for s, c, o in map(parse_block, block)
     ]
 
-def find_all_matches(block, full_data):
+def find_all_matches(block, full_data, mode="above"):
     matches = []
     block_len = len(block)
     for i in reversed(range(len(full_data) - block_len)):
         candidate = full_data[i:i + block_len]
         if candidate == block:
-            pred_index = i - 1
-            pred = full_data[pred_index] if pred_index >= 0 else "❌ 없음"
+            if mode == "above":
+                pred_index = i - 1
+            else:
+                pred_index = i + block_len
+            if 0 <= pred_index < len(full_data):
+                pred = full_data[pred_index]
+            else:
+                pred = "❌ 없음"
             matches.append({
                 "값": pred,
                 "블럭": ">".join(block),
@@ -66,19 +69,16 @@ def find_all_matches(block, full_data):
         })
     return matches
 
-# index.html 반환
 @app.route("/")
 def home():
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
-# 예측 API
 @app.route("/predict")
 def predict():
     try:
         mode = request.args.get("mode", "3block_orig")
         size = int(mode[0])
 
-        # Supabase에서 최신 3000줄 분석
         response = supabase.table(SUPABASE_TABLE) \
             .select("*") \
             .order("reg_date", desc=True) \
@@ -87,9 +87,8 @@ def predict():
             .execute()
 
         raw = response.data
-        print("[📦 Supabase 첫 줄]", raw[0])  # 디버깅 출력
+        print("[📦 Supabase 첫 줄]", raw[0])
 
-        # ✅ 가장 최신 줄의 회차값 기준으로 예측 회차 계산
         round_num = int(raw[0]["date_round"]) + 1
 
         all_data = [convert(d) for d in raw]
@@ -104,23 +103,21 @@ def predict():
         else:
             flow = recent_flow
 
-        matches = find_all_matches(flow, all_data)
+        matches_above = find_all_matches(flow, all_data, mode="above")
+        matches_below = find_all_matches(flow, all_data, mode="below")
 
-        # ✅ 순번 기준 최신순으로 정렬 후 상위 5개만 출력
-        matches = sorted(
-            matches,
-            key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999
-        )[:5]
+        matches_above = sorted(matches_above, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
+        matches_below = sorted(matches_below, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
 
         return jsonify({
             "예측회차": round_num,
-            "예측값들": matches
+            "상단기준": matches_above,
+            "하단기준": matches_below
         })
 
     except Exception as e:
         return jsonify({"error": str(e)})
 
-# 실행
 if __name__ == '__main__':
     port = int(os.environ.get("PORT") or 5000)
     app.run(host='0.0.0.0', port=port)
