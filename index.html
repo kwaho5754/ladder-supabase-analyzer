@@ -15,7 +15,9 @@
       margin-bottom: 2rem;
     }
     h2 {
-      margin-top: 2rem;
+      font-size: 1.4rem;
+      margin-top: 2.5rem;
+      margin-bottom: 1rem;
     }
     .section {
       margin-bottom: 3rem;
@@ -39,6 +41,7 @@
     .card h4 {
       font-size: 0.95rem;
       margin-top: 0.8rem;
+      margin-bottom: 0.4rem;
     }
     .card ol {
       padding-left: 1.2rem;
@@ -73,7 +76,7 @@
       "flip_full": "완전 대칭"
     };
 
-    const groupByBlockSize = {
+    const groupByBlock = {
       "3block": [],
       "4block": [],
       "5block": []
@@ -84,7 +87,7 @@
         try {
           const res = await fetch(`/predict?mode=${mode}`);
           const data = await res.json();
-          groupByBlockSize[mode.slice(0, 7)].push({ mode, data });
+          groupByBlock[mode.slice(0, 7)].push({ mode, data });
         } catch (e) {
           console.error("❌ 실패:", mode, e);
         }
@@ -92,7 +95,7 @@
 
       const resultContainer = document.getElementById("results");
 
-      for (const blockKey of Object.keys(groupByBlockSize)) {
+      for (const blockKey of Object.keys(groupByBlock)) {
         const section = document.createElement("div");
         section.className = "section";
 
@@ -103,15 +106,17 @@
         const row = document.createElement("div");
         row.className = "card-row";
 
-        for (const { mode, data } of groupByBlockSize[blockKey]) {
+        for (const { mode, data } of groupByBlock[blockKey]) {
+          const mkey = mode.split("_")[1];
           const card = document.createElement("div");
           card.className = "card";
 
-          const mkey = mode.split("_")[1];
           const label = document.createElement("h3");
           label.textContent = `${transformLabel[mkey]} (회차 ${data["예측회차"]})`;
           card.appendChild(label);
 
+          const topLabel = document.createElement("h4");
+          topLabel.textContent = "🔺 상단값 예측";
           const topList = document.createElement("ol");
           for (const item of data["상단값들"]) {
             const li = document.createElement("li");
@@ -119,17 +124,14 @@
             topList.appendChild(li);
           }
 
+          const bottomLabel = document.createElement("h4");
+          bottomLabel.textContent = "🔻 하단값 예측";
           const bottomList = document.createElement("ol");
           for (const item of data["하단값들"]) {
             const li = document.createElement("li");
             li.textContent = `${item["값"]} | 블럭: ${item["블럭"]} | 순번: ${item["순번"]}`;
             bottomList.appendChild(li);
           }
-
-          const topLabel = document.createElement("h4");
-          topLabel.textContent = "🔺 상단값 예측";
-          const bottomLabel = document.createElement("h4");
-          bottomLabel.textContent = "🔻 하단값 예측";
 
           card.appendChild(topLabel);
           card.appendChild(topList);
