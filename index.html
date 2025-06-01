@@ -1,89 +1,135 @@
+```html
 <!DOCTYPE html>
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>사다리 예측 시스템</title>
+  <title>사다리 블럭 예측 결과</title>
   <style>
     body {
-      font-family: 'Pretendard', sans-serif;
-      margin: 2rem;
-      background-color: #f5f5f5;
-      color: #222;
+      font-family: "Noto Sans KR", sans-serif;
+      background: #f4f7ff;
+      padding: 2rem;
     }
     h1 {
       font-size: 1.8rem;
-      margin-bottom: 1rem;
+      margin-bottom: 2rem;
+      text-align: center;
     }
-    .section {
+    h2 {
       margin-top: 2rem;
     }
-    .result-block {
+    .section {
+      margin-bottom: 2.5rem;
+    }
+    .card-group {
       display: flex;
       flex-wrap: wrap;
       gap: 1rem;
+      margin-top: 0.5rem;
     }
     .card {
       background: #fff;
-      border-radius: 8px;
       padding: 1rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-      width: 240px;
+      border-radius: 0.8rem;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+      width: 260px;
     }
     .card h3 {
-      margin: 0 0 0.5rem;
-      font-size: 1.2rem;
+      margin: 0 0 0.5rem 0;
+      font-size: 1rem;
     }
-    .card p {
-      margin: 0.2rem 0;
+    .card ol {
+      padding-left: 1.2rem;
+      margin-top: 0.5rem;
+    }
+    .card li {
+      font-size: 0.9rem;
+      margin-bottom: 0.4rem;
     }
   </style>
 </head>
 <body>
-  <h1>사다리 예측 시스템 (3~5줄 상단/하단)</h1>
-  <div id="round">예측 회차: 로딩 중...</div>
-
-  <div class="section">
-    <h2>📌 3줄 블럭 - 상단</h2>
-    <div id="block3_above" class="result-block"></div>
-    <h2>📌 3줄 블럭 - 하단</h2>
-    <div id="block3_below" class="result-block"></div>
-
-    <h2>📌 4줄 블럭 - 상단</h2>
-    <div id="block4_above" class="result-block"></div>
-    <h2>📌 4줄 블럭 - 하단</h2>
-    <div id="block4_below" class="result-block"></div>
-
-    <h2>📌 5줄 블럭 - 상단</h2>
-    <div id="block5_above" class="result-block"></div>
-    <h2>📌 5줄 블럭 - 하단</h2>
-    <div id="block5_below" class="result-block"></div>
-  </div>
+  <h1>🔮 사다리 블럭 예측 결과</h1>
+  <div id="results"></div>
 
   <script>
-    fetch("/predict")
-      .then(res => res.json())
-      .then(data => {
-        document.getElementById("round").innerText = `예측 회차: ${data["예측회차"]}`;
+    const modes = [
+      "3block_orig", "3block_flip_full", "3block_flip_start", "3block_flip_odd_even",
+      "4block_orig", "4block_flip_full", "4block_flip_start", "4block_flip_odd_even",
+      "5block_orig", "5block_flip_full", "5block_flip_start", "5block_flip_odd_even"
+    ];
 
-        const makeCard = (item) => {
-          const div = document.createElement("div");
-          div.className = "card";
-          div.innerHTML = `
-            <h3>${item["값"]}</h3>
-            <p><strong>블럭:</strong> ${item["블럭"]}</p>
-            <p><strong>순번:</strong> ${item["순번"]}</p>
-          `;
-          return div;
-        };
+    const modeTitles = {
+      "3block": "3줄 블럭",
+      "4block": "4줄 블럭",
+      "5block": "5줄 블럭"
+    };
 
-        [3, 4, 5].forEach(size => {
-          const top = document.getElementById(`block${size}_above`);
-          const bottom = document.getElementById(`block${size}_below`);
-          data[`${size}줄_상단`].forEach(item => top.appendChild(makeCard(item)));
-          data[`${size}줄_하단`].forEach(item => bottom.appendChild(makeCard(item)));
-        });
-      });
+    const transformLabel = {
+      "orig": "원본",
+      "flip_start": "시작점 변형",
+      "flip_odd_even": "홀짝 변형",
+      "flip_full": "완전 대칭"
+    };
+
+    const getModeKey = (mode) => mode.split("_")[0];
+
+    function createCardGroup(title, items) {
+      const wrapper = document.createElement("div");
+
+      const label = document.createElement("h3");
+      label.textContent = title;
+      wrapper.appendChild(label);
+
+      const group = document.createElement("div");
+      group.className = "card-group";
+
+      const card = document.createElement("div");
+      card.className = "card";
+
+      const list = document.createElement("ol");
+      for (const item of items) {
+        const li = document.createElement("li");
+        li.textContent = `${item["값"]} | 블럭: ${item["블럭"]} | 순번: ${item["순번"]}`;
+        list.appendChild(li);
+      }
+
+      card.appendChild(list);
+      group.appendChild(card);
+      wrapper.appendChild(group);
+
+      return wrapper;
+    }
+
+    async function loadResults() {
+      const resultContainer = document.getElementById("results");
+
+      for (const mode of modes) {
+        try {
+          const res = await fetch(`/predict?mode=${mode}`);
+          const data = await res.json();
+
+          const section = document.createElement("div");
+          section.className = "section";
+
+          const mkey = getModeKey(mode);
+          const typeKey = mode.split("_").slice(1).join("_");
+
+          const title = document.createElement("h2");
+          title.textContent = `${modeTitles[mkey]} (${transformLabel[typeKey]}) - 회차 ${data["예측회차"]}`;
+          section.appendChild(title);
+
+          section.appendChild(createCardGroup("🔺 상단값 예측", data["상단값들"]));
+          section.appendChild(createCardGroup("🔻 하단값 예측", data["하단값들"]));
+
+          resultContainer.appendChild(section);
+        } catch (e) {
+          console.error(`❌ ${mode} 예측 오류`, e);
+        }
+      }
+    }
+
+    loadResults();
   </script>
 </body>
 </html>
