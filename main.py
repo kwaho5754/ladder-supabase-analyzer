@@ -34,7 +34,8 @@ def flip_odd_even(block):
     return [('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o for s, c, o in map(parse_block, block)]
 
 def find_all_matches(block, full_data):
-    top_matches, bottom_matches = [], []
+    top_matches = []
+    bottom_matches = []
     block_len = len(block)
 
     for i in reversed(range(len(full_data) - block_len)):
@@ -57,43 +58,68 @@ def find_all_matches(block, full_data):
 def home():
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
-@app.route("/predict_top1")
-def predict_top1():
+@app.route("/predict")
+def predict():
     try:
+        mode = request.args.get("mode", "3block_orig")
+        size = int(mode[0])
+
         response = supabase.table(SUPABASE_TABLE).select("*") \
             .order("reg_date", desc=True).order("date_round", desc=True).limit(3000).execute()
         raw = response.data
         round_num = int(raw[0]["date_round"]) + 1
         all_data = [convert(d) for d in raw]
+        recent_flow = all_data[:size]
 
-        transform_modes = {
+        if "flip_full" in mode:
+            flow = flip_full(recent_flow)
+        elif "flip_start" in mode:
+            flow = flip_start(recent_flow)
+        elif "flip_odd_even" in mode:
+            flow = flip_odd_even(recent_flow)
+        else:
+            flow = recent_flow
+
+        top, bottom = find_all_matches(flow, all_data)
+
+        return jsonify({
+            "예측회차": round_num,
+            "상단값들": top,
+            "하단값들": bottom
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
+@app.route("/predict_top1_summary")
+def predict_top1_summary():
+    try:
+        response = supabase.table(SUPABASE_TABLE).select("*") \
+            .order("reg_date", desc=True).order("date_round", desc=True).limit(3000).execute()
+        raw = response.data
+        all_data = [convert(d) for d in raw]
+
+        modes = {
             "orig": lambda x: x,
             "flip_full": flip_full,
             "flip_start": flip_start,
             "flip_odd_even": flip_odd_even
         }
 
-        def extract(block_size):
-            top_vals, bottom_vals = [], []
-            for mode_fn in transform_modes.values():
-                block = mode_fn(all_data[:block_size])
-                top, bottom = find_all_matches(block, all_data)
-                top_vals.extend([v["값"] for v in top if v["값"] != "❌ 없음"])
-                bottom_vals.extend([v["값"] for v in bottom if v["값"] != "❌ 없음"])
-            return Counter(top_vals).most_common(1), Counter(bottom_vals).most_common(1)
-
-        result = {}
+        summary = {}
         for size in [3, 4, 5, 6]:
-            top, bottom = extract(size)
-            result[f"{size}줄"] = {
-                "상단Top1": top[0][0] if top else "❌ 없음",
-                "하단Top1": bottom[0][0] if bottom else "❌ 없음"
+            top_values, bottom_values = [], []
+            for mode_key, mode_fn in modes.items():
+                recent_block = all_data[:size]
+                flow = mode_fn(recent_block)
+                top, bottom = find_all_matches(flow, all_data)
+                top_values.extend([x["값"] for x in top if x["값"] != "❌ 없음"])
+                bottom_values.extend([x["값"] for x in bottom if x["값"] != "❌ 없음"])
+            summary[f"{size}줄"] = {
+                "Top1상단": Counter(top_values).most_common(1)[0][0] if top_values else "❌ 없음",
+                "Top1하단": Counter(bottom_values).most_common(1)[0][0] if bottom_values else "❌ 없음"
             }
 
-        return jsonify({"예측회차": round_num, "Top1요약": result})
+        return jsonify({"Top1요약": summary})
     except Exception as e:
         return jsonify({"error": str(e)})
-
-if __name__ == '__main__':
-    port = int(os.environ.get("PORT") or 5000)
-    app.run(host='0.0.0.0', port=port)
