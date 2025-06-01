@@ -26,55 +26,43 @@ def parse_block(s):
     return s[0], s[1:-1], s[-1]
 
 def flip_full(block):
-    return [
-        ('우' if s == '좌' else '좌') + c + ('짝' if o == '홀' else '홀')
-        for s, c, o in map(parse_block, block)
-    ]
+    return [('우' if s == '좌' else '좌') + c + ('짝' if o == '홀' else '홀') for s, c, o in map(parse_block, block)]
 
 def flip_start(block):
-    return [
-        s + ('4' if c == '3' else '3') + ('홀' if o == '짝' else '짝')
-        for s, c, o in map(parse_block, block)
-    ]
+    return [s + ('4' if c == '3' else '3') + ('홀' if o == '짝' else '짝') for s, c, o in map(parse_block, block)]
 
 def flip_odd_even(block):
-    return [
-        ('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o
-        for s, c, o in map(parse_block, block)
-    ]
+    return [('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o for s, c, o in map(parse_block, block)]
 
 def find_all_matches(block, full_data):
-    top_matches = []
-    bottom_matches = []
+    matches = []
     block_len = len(block)
 
     for i in reversed(range(len(full_data) - block_len)):
         candidate = full_data[i:i + block_len]
         if candidate == block:
-            # 상단값
-            top_index = i - 1
-            top_pred = full_data[top_index] if top_index >= 0 else "❌ 없음"
-            top_matches.append({
-                "값": top_pred,
+            pred_index = i - 1
+            pred = full_data[pred_index] if pred_index >= 0 else "❌ 없음"
+            matches.append({
+                "값": pred,
                 "블럭": ">".join(block),
                 "순번": i + 1
             })
 
-            # 하단값
-            bottom_index = i + block_len
-            bottom_pred = full_data[bottom_index] if bottom_index < len(full_data) else "❌ 없음"
-            bottom_matches.append({
-                "값": bottom_pred,
-                "블럭": ">".join(block),
-                "순번": i + 1
-            })
+    if not matches:
+        matches.append({
+            "값": "❌ 없음",
+            "블럭": ">".join(block),
+            "순번": "❌"
+        })
 
-    if not top_matches:
-        top_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
-    if not bottom_matches:
-        bottom_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
+    # ✅ 순번 낮은 값이 위쪽에 오도록 정렬 (사람 시선 기준)
+    matches = sorted(
+        matches,
+        key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999
+    )[:5]
 
-    return top_matches[:5], bottom_matches[:5]
+    return matches
 
 @app.route("/")
 def home():
@@ -94,7 +82,7 @@ def predict():
             .execute()
 
         raw = response.data
-        print("[📦 Supabase 첫 줄]", raw[0])  # 디버깅 출력
+        print("[📦 Supabase 첫 줄]", raw[0])
 
         round_num = int(raw[0]["date_round"]) + 1
 
@@ -110,12 +98,11 @@ def predict():
         else:
             flow = recent_flow
 
-        top, bottom = find_all_matches(flow, all_data)
+        matches = find_all_matches(flow, all_data)
 
         return jsonify({
             "예측회차": round_num,
-            "상단값들": top,
-            "하단값들": bottom
+            "예측값들": matches
         })
 
     except Exception as e:
