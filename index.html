@@ -4,52 +4,20 @@
   <meta charset="UTF-8" />
   <title>사다리 블럭 예측 결과</title>
   <style>
-    body {
-      font-family: "Noto Sans KR", sans-serif;
-      background: #f4f7ff;
-      padding: 2rem;
-    }
-    h1 {
-      font-size: 1.8rem;
-      text-align: center;
-      margin-bottom: 2rem;
-    }
-    h2 {
-      font-size: 1.4rem;
-      margin-top: 2.5rem;
-      margin-bottom: 1rem;
-    }
-    .section {
-      margin-bottom: 3rem;
-    }
-    .card-row {
-      display: flex;
-      gap: 1rem;
-      flex-wrap: wrap;
-    }
+    body { font-family: "Noto Sans KR", sans-serif; background: #f4f7ff; padding: 2rem; }
+    h1 { font-size: 1.8rem; text-align: center; margin-bottom: 2rem; }
+    h2 { font-size: 1.4rem; margin-top: 2.5rem; margin-bottom: 1rem; }
+    .section { margin-bottom: 3rem; }
+    .card-row { display: flex; gap: 1rem; flex-wrap: wrap; }
     .card {
-      background: #fff;
-      padding: 1rem;
-      border-radius: 0.8rem;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1);
-      width: 280px;
+      background: #fff; padding: 1rem; border-radius: 0.8rem;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1); width: 280px;
     }
-    .card h3 {
-      font-size: 1rem;
-      margin-bottom: 0.5rem;
-    }
-    .card h4 {
-      font-size: 0.95rem;
-      margin-top: 0.8rem;
-      margin-bottom: 0.4rem;
-    }
-    .card ol {
-      padding-left: 1.2rem;
-    }
-    .card li {
-      font-size: 0.9rem;
-      margin-bottom: 0.4rem;
-    }
+    .card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
+    .card h4 { font-size: 0.95rem; margin-top: 0.8rem; margin-bottom: 0.4rem; }
+    .card ol { padding-left: 1.2rem; }
+    .card li { font-size: 0.9rem; margin-bottom: 0.4rem; }
+    .top1 { font-size: 0.9rem; background: #f1f1f1; padding: 0.3rem 0.5rem; margin: 0.3rem 0; border-radius: 4px; }
   </style>
 </head>
 <body>
@@ -65,17 +33,12 @@
     ];
 
     const modeTitles = {
-      "3block": "3줄 블럭",
-      "4block": "4줄 블럭",
-      "5block": "5줄 블럭",
-      "6block": "6줄 블럭"
+      "3block": "3줄 블럭", "4block": "4줄 블럭", "5block": "5줄 블럭", "6block": "6줄 블럭"
     };
 
     const transformLabel = {
-      "orig": "원본",
-      "flip_start": "시작점 변형",
-      "flip_odd_even": "홀짝 변형",
-      "flip_full": "완전 대칭"
+      "orig": "원본", "flip_start": "시작점 변형",
+      "flip_odd_even": "홀짝 변형", "flip_full": "완전 대칭"
     };
 
     const getModeKey = (mode) => mode.split("_")[0];
@@ -90,6 +53,16 @@
       const label = document.createElement("h3");
       label.textContent = `${modeTitles[mkey]} (${transformLabel[typeKey]}) (회차 ${data["예측회차"]})`;
       card.appendChild(label);
+
+      const top1 = document.createElement("div");
+      top1.className = "top1";
+      top1.textContent = `Top1 상단값: ${data["상단Top1"]}`;
+      card.appendChild(top1);
+
+      const bottom1 = document.createElement("div");
+      bottom1.className = "top1";
+      bottom1.textContent = `Top1 하단값: ${data["하단Top1"]}`;
+      card.appendChild(bottom1);
 
       const topLabel = document.createElement("h4");
       topLabel.textContent = "🔺 상단값 예측";

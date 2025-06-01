@@ -2,11 +2,10 @@ from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
+from collections import Counter
 import os
 
-# .env 환경변수 로드
 load_dotenv()
-
 app = Flask(__name__)
 CORS(app)
 
@@ -35,45 +34,25 @@ def flip_odd_even(block):
     return [('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o for s, c, o in map(parse_block, block)]
 
 def find_all_matches(block, full_data):
-    top_matches = []
-    bottom_matches = []
+    top_matches, bottom_matches = [], []
     block_len = len(block)
 
     for i in reversed(range(len(full_data) - block_len)):
         candidate = full_data[i:i + block_len]
         if candidate == block:
-            # 상단값
             top_index = i - 1
             top_pred = full_data[top_index] if top_index >= 0 else "❌ 없음"
-            top_matches.append({
-                "값": top_pred,
-                "블럭": ">".join(block),
-                "순번": i + 1
-            })
+            top_matches.append({"값": top_pred, "블럭": ">".join(block), "순번": i + 1})
 
-            # 하단값
             bottom_index = i + block_len
             bottom_pred = full_data[bottom_index] if bottom_index < len(full_data) else "❌ 없음"
-            bottom_matches.append({
-                "값": bottom_pred,
-                "블럭": ">".join(block),
-                "순번": i + 1
-            })
+            bottom_matches.append({"값": bottom_pred, "블럭": ">".join(block), "순번": i + 1})
 
     if not top_matches:
-        top_matches.append({
-            "값": "❌ 없음",
-            "블럭": ">".join(block),
-            "순번": "❌"
-        })
+        top_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
     if not bottom_matches:
-        bottom_matches.append({
-            "값": "❌ 없음",
-            "블럭": ">".join(block),
-            "순번": "❌"
-        })
+        bottom_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
 
-    # ✅ 정렬: 순번 낮은 게 위 (사람 시선 기준)
     top_matches = sorted(top_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
     bottom_matches = sorted(bottom_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
 
@@ -93,14 +72,10 @@ def predict():
             .select("*") \
             .order("reg_date", desc=True) \
             .order("date_round", desc=True) \
-            .limit(3000) \
-            .execute()
+            .limit(3000).execute()
 
         raw = response.data
-        print("[📦 Supabase 첫 줄]", raw[0])
-
         round_num = int(raw[0]["date_round"]) + 1
-
         all_data = [convert(d) for d in raw]
         recent_flow = all_data[:size]
 
@@ -115,10 +90,17 @@ def predict():
 
         top, bottom = find_all_matches(flow, all_data)
 
+        def get_top1(values):
+            only_values = [v["값"] for v in values if v["값"] != "❌ 없음"]
+            counter = Counter(only_values)
+            return counter.most_common(1)[0][0] if counter else "❌ 없음"
+
         return jsonify({
             "예측회차": round_num,
             "상단값들": top,
-            "하단값들": bottom
+            "하단값들": bottom,
+            "상단Top1": get_top1(top),
+            "하단Top1": get_top1(bottom)
         })
 
     except Exception as e:
