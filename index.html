@@ -11,35 +11,40 @@
     }
     h1 {
       font-size: 1.8rem;
-      margin-bottom: 2rem;
       text-align: center;
+      margin-bottom: 2rem;
+    }
+    h2 {
+      font-size: 1.4rem;
+      margin-top: 2.5rem;
+      margin-bottom: 1rem;
     }
     .section {
-      margin-bottom: 2rem;
+      margin-bottom: 3rem;
     }
-    .card-group {
+    .card-row {
       display: flex;
-      flex-wrap: wrap;
       gap: 1rem;
+      flex-wrap: wrap;
     }
     .card {
       background: #fff;
       padding: 1rem;
       border-radius: 0.8rem;
       box-shadow: 0 0 8px rgba(0,0,0,0.1);
-      width: 260px;
+      width: 280px;
     }
     .card h3 {
-      margin: 0 0 0.5rem 0;
       font-size: 1rem;
+      margin-bottom: 0.5rem;
     }
     .card h4 {
-      font-size: 0.9rem;
-      margin: 0.8rem 0 0.3rem;
+      font-size: 0.95rem;
+      margin-top: 0.8rem;
+      margin-bottom: 0.4rem;
     }
     .card ol {
       padding-left: 1.2rem;
-      margin-top: 0.2rem;
     }
     .card li {
       font-size: 0.9rem;
@@ -55,13 +60,15 @@
     const modes = [
       "3block_orig", "3block_flip_full", "3block_flip_start", "3block_flip_odd_even",
       "4block_orig", "4block_flip_full", "4block_flip_start", "4block_flip_odd_even",
-      "5block_orig", "5block_flip_full", "5block_flip_start", "5block_flip_odd_even"
+      "5block_orig", "5block_flip_full", "5block_flip_start", "5block_flip_odd_even",
+      "6block_orig", "6block_flip_full", "6block_flip_start", "6block_flip_odd_even"
     ];
 
     const modeTitles = {
       "3block": "3줄 블럭",
       "4block": "4줄 블럭",
-      "5block": "5줄 블럭"
+      "5block": "5줄 블럭",
+      "6block": "6줄 블럭"
     };
 
     const transformLabel = {
@@ -84,7 +91,6 @@
       label.textContent = `${modeTitles[mkey]} (${transformLabel[typeKey]}) (회차 ${data["예측회차"]})`;
       card.appendChild(label);
 
-      // 🔺 상단값
       const topLabel = document.createElement("h4");
       topLabel.textContent = "🔺 상단값 예측";
       card.appendChild(topLabel);
@@ -97,7 +103,6 @@
       }
       card.appendChild(topList);
 
-      // 🔻 하단값
       const bottomLabel = document.createElement("h4");
       bottomLabel.textContent = "🔻 하단값 예측";
       card.appendChild(bottomLabel);
@@ -131,12 +136,12 @@
             title.textContent = modeTitles[sectionKey];
             section.appendChild(title);
 
-            const group = document.createElement("div");
-            group.className = "card-group";
-            section.appendChild(group);
+            const row = document.createElement("div");
+            row.className = "card-row";
+            section.appendChild(row);
 
             resultContainer.appendChild(section);
-            sectionMap[sectionKey] = group;
+            sectionMap[sectionKey] = row;
           }
 
           sectionMap[sectionKey].appendChild(createCard(mode, data));
