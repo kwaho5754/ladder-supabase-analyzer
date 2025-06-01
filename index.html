@@ -31,7 +31,7 @@
 <body>
   <h1>🔮 사다리 블럭 예측 결과</h1>
 
-  <!-- ✅ Top3 요약 테이블 (3줄 + 4줄 블럭, 원본 제외) -->
+  <!-- ✅ Top3 요약 테이블 (3줄 블럭, 원본 제외) -->
   <div class="summary-box">
     <table>
       <thead>
@@ -110,18 +110,16 @@
     async function loadTop3Summary() {
       const res = await fetch("/predict_top3_summary");
       const data = await res.json();
+      const info = data["3줄 블럭 Top3 요약"];
       const tbody = document.getElementById("top3-summary-body");
 
-      for (const key of Object.keys(data)) {
-        const info = data[key];
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${key.replace(" Top3 요약", "")}</td>
-          <td>${info["Top3상단"].join(", ")}</td>
-          <td>${info["Top3하단"].join(", ")}</td>
-        `;
-        tbody.appendChild(row);
-      }
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>3줄 블럭</td>
+        <td>${info["Top3상단"].join(", ")}</td>
+        <td>${info["Top3하단"].join(", ")}</td>
+      `;
+      tbody.appendChild(row);
     }
 
     async function loadResults() {

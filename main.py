@@ -44,11 +44,19 @@ def find_all_matches(block, full_data):
         if candidate == block:
             top_index = i - 1
             top_pred = full_data[top_index] if top_index >= 0 else "❌ 없음"
-            top_matches.append({"값": top_pred, "블럭": ">".join(block), "순번": i + 1})
+            top_matches.append({
+                "값": top_pred,
+                "블럭": ">".join(block),
+                "순번": i + 1
+            })
 
             bottom_index = i + block_len
             bottom_pred = full_data[bottom_index] if bottom_index < len(full_data) else "❌ 없음"
-            bottom_matches.append({"값": bottom_pred, "블럭": ">".join(block), "순번": i + 1})
+            bottom_matches.append({
+                "값": bottom_pred,
+                "블럭": ">".join(block),
+                "순번": i + 1
+            })
 
     if not top_matches:
         top_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
@@ -64,11 +72,48 @@ def find_all_matches(block, full_data):
 def home():
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
+@app.route("/predict")
+def predict():
+    try:
+        mode = request.args.get("mode", "3block_orig")
+        size = int(mode[0])
+
+        response = supabase.table(SUPABASE_TABLE) \
+            .select("*") \
+            .order("reg_date", desc=True) \
+            .order("date_round", desc=True) \
+            .limit(3000) \
+            .execute()
+
+        raw = response.data
+        round_num = int(raw[0]["date_round"]) + 1
+        all_data = [convert(d) for d in raw]
+        recent_flow = all_data[:size]
+
+        if "flip_full" in mode:
+            flow = flip_full(recent_flow)
+        elif "flip_start" in mode:
+            flow = flip_start(recent_flow)
+        elif "flip_odd_even" in mode:
+            flow = flip_odd_even(recent_flow)
+        else:
+            flow = recent_flow
+
+        top, bottom = find_all_matches(flow, all_data)
+
+        return jsonify({
+            "예측회차": round_num,
+            "상단값들": top,
+            "하단값들": bottom
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 @app.route("/predict_top3_summary")
 def predict_top3_summary():
     try:
         from itertools import chain
-
         response = supabase.table(SUPABASE_TABLE) \
             .select("*") \
             .order("reg_date", desc=True) \
@@ -81,7 +126,7 @@ def predict_top3_summary():
 
         result = {}
 
-        for size in [3, 4]:
+        for size in [3, 4]:  # 3줄 + 4줄 블럭 포함
             recent_block = all_data[:size]
             transform_modes = {
                 "flip_full": flip_full,
