@@ -2,129 +2,49 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>사다리 블럭 예측 결과</title>
+  <title>사다리 블럭 Top1 요약</title>
   <style>
-    body { font-family: "Noto Sans KR", sans-serif; background: #f4f7ff; padding: 2rem; }
-    h1 { font-size: 1.8rem; text-align: center; margin-bottom: 2rem; }
-    h2 { font-size: 1.4rem; margin-top: 2.5rem; margin-bottom: 1rem; }
-    .section { margin-bottom: 3rem; }
-    .card-row { display: flex; gap: 1rem; flex-wrap: wrap; }
-    .card {
-      background: #fff; padding: 1rem; border-radius: 0.8rem;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1); width: 280px;
-    }
-    .card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
-    .card h4 { font-size: 0.95rem; margin-top: 0.8rem; margin-bottom: 0.4rem; }
-    .card ol { padding-left: 1.2rem; }
-    .card li { font-size: 0.9rem; margin-bottom: 0.4rem; }
-    .top1 { font-size: 0.9rem; background: #f1f1f1; padding: 0.3rem 0.5rem; margin: 0.3rem 0; border-radius: 4px; }
+    body { font-family: "Noto Sans KR", sans-serif; background: #f6f9ff; padding: 2rem; }
+    h1 { text-align: center; font-size: 1.8rem; margin-bottom: 2rem; }
+    table { width: 100%; max-width: 600px; margin: 0 auto; border-collapse: collapse; background: #fff; border-radius: 12px; overflow: hidden; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    th, td { padding: 1rem; text-align: center; font-size: 1rem; border-bottom: 1px solid #eee; }
+    th { background: #eef3fc; font-weight: 600; }
+    tr:last-child td { border-bottom: none; }
   </style>
 </head>
 <body>
-  <h1>🔮 사다리 블럭 예측 결과</h1>
-  <div id="results"></div>
+  <h1>🔮 블럭별 Top1 예측 요약</h1>
+  <table>
+    <thead>
+      <tr>
+        <th>블럭</th>
+        <th>Top1 상단값</th>
+        <th>Top1 하단값</th>
+      </tr>
+    </thead>
+    <tbody id="top1-table">
+    </tbody>
+  </table>
 
   <script>
-    const modes = [
-      "3block_orig", "3block_flip_full", "3block_flip_start", "3block_flip_odd_even",
-      "4block_orig", "4block_flip_full", "4block_flip_start", "4block_flip_odd_even",
-      "5block_orig", "5block_flip_full", "5block_flip_start", "5block_flip_odd_even",
-      "6block_orig", "6block_flip_full", "6block_flip_start", "6block_flip_odd_even"
-    ];
+    async function loadTop1() {
+      const res = await fetch("/predict_top1");
+      const data = await res.json();
+      const tbody = document.getElementById("top1-table");
+      const items = data["블럭별Top1"] || {};
 
-    const modeTitles = {
-      "3block": "3줄 블럭", "4block": "4줄 블럭", "5block": "5줄 블럭", "6block": "6줄 블럭"
-    };
-
-    const transformLabel = {
-      "orig": "원본", "flip_start": "시작점 변형",
-      "flip_odd_even": "홀짝 변형", "flip_full": "완전 대칭"
-    };
-
-    const getModeKey = (mode) => mode.split("_")[0];
-
-    function createCard(mode, data) {
-      const card = document.createElement("div");
-      card.className = "card";
-
-      const mkey = getModeKey(mode);
-      const typeKey = mode.split("_").slice(1).join("_");
-
-      const label = document.createElement("h3");
-      label.textContent = `${modeTitles[mkey]} (${transformLabel[typeKey]}) (회차 ${data["예측회차"]})`;
-      card.appendChild(label);
-
-      const top1 = document.createElement("div");
-      top1.className = "top1";
-      top1.textContent = `Top1 상단값: ${data["상단Top1"]}`;
-      card.appendChild(top1);
-
-      const bottom1 = document.createElement("div");
-      bottom1.className = "top1";
-      bottom1.textContent = `Top1 하단값: ${data["하단Top1"]}`;
-      card.appendChild(bottom1);
-
-      const topLabel = document.createElement("h4");
-      topLabel.textContent = "🔺 상단값 예측";
-      card.appendChild(topLabel);
-
-      const topList = document.createElement("ol");
-      for (const match of data["상단값들"] || []) {
-        const item = document.createElement("li");
-        item.textContent = `${match["값"]} | 블럭: ${match["블럭"]} | 순번: ${match["순번"]}`;
-        topList.appendChild(item);
-      }
-      card.appendChild(topList);
-
-      const bottomLabel = document.createElement("h4");
-      bottomLabel.textContent = "🔻 하단값 예측";
-      card.appendChild(bottomLabel);
-
-      const bottomList = document.createElement("ol");
-      for (const match of data["하단값들"] || []) {
-        const item = document.createElement("li");
-        item.textContent = `${match["값"]} | 블럭: ${match["블럭"]} | 순번: ${match["순번"]}`;
-        bottomList.appendChild(item);
-      }
-      card.appendChild(bottomList);
-
-      return card;
-    }
-
-    async function loadResults() {
-      const resultContainer = document.getElementById("results");
-      const sectionMap = {};
-
-      for (const mode of modes) {
-        try {
-          const res = await fetch(`/predict?mode=${mode}`);
-          const data = await res.json();
-
-          const sectionKey = getModeKey(mode);
-          if (!sectionMap[sectionKey]) {
-            const section = document.createElement("div");
-            section.className = "section";
-
-            const title = document.createElement("h2");
-            title.textContent = modeTitles[sectionKey];
-            section.appendChild(title);
-
-            const row = document.createElement("div");
-            row.className = "card-row";
-            section.appendChild(row);
-
-            resultContainer.appendChild(section);
-            sectionMap[sectionKey] = row;
-          }
-
-          sectionMap[sectionKey].appendChild(createCard(mode, data));
-        } catch (e) {
-          console.error(`❌ 오류: ${mode} 예측 결과 불러오기 실패`, e);
-        }
+      for (const block in items) {
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${block}</td>
+          <td>${items[block]["상단Top1"]}</td>
+          <td>${items[block]["하단Top1"]}</td>
+        `;
+        tbody.appendChild(row);
       }
     }
 
-    loadResults();
+    loadTop1();
   </script>
 </body>
 </html>
