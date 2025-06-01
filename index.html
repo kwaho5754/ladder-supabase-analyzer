@@ -7,7 +7,7 @@
     body { font-family: "Noto Sans KR", sans-serif; background: #f4f7ff; padding: 2rem; }
     h1 { font-size: 1.8rem; text-align: center; margin-bottom: 2rem; }
     .summary-box {
-      max-width: 600px; margin: 0 auto 2rem auto;
+      max-width: 800px; margin: 0 auto 2rem auto;
       background: #fff; border-radius: 10px;
       box-shadow: 0 0 6px rgba(0,0,0,0.1); padding: 1rem;
     }
@@ -36,8 +36,8 @@
       <thead>
         <tr>
           <th>블럭</th>
-          <th>Top1 상단값</th>
-          <th>Top1 하단값</th>
+          <th>Top3 상단값</th>
+          <th>Top3 하단값</th>
         </tr>
       </thead>
       <tbody id="top1-summary-body">
@@ -57,17 +57,13 @@
     ];
 
     const modeTitles = {
-      "3block": "3줄 블럭",
-      "4block": "4줄 블럭",
-      "5block": "5줄 블럭",
-      "6block": "6줄 블럭"
+      "3block": "3줄 블럭", "4block": "4줄 블럭",
+      "5block": "5줄 블럭", "6block": "6줄 블럭"
     };
 
     const transformLabel = {
-      "orig": "원본",
-      "flip_start": "시작점 변형",
-      "flip_odd_even": "홀짝 변형",
-      "flip_full": "완전 대칭"
+      "orig": "원본", "flip_start": "시작점 변형",
+      "flip_odd_even": "홀짝 변형", "flip_full": "완전 대칭"
     };
 
     const getModeKey = (mode) => mode.split("_")[0];
@@ -117,13 +113,13 @@
       const tbody = document.getElementById("top1-summary-body");
 
       for (const block in top1) {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `
+        const row = document.createElement("tr");
+        row.innerHTML = `
           <td>${block}</td>
-          <td>${top1[block]["Top1상단"]}</td>
-          <td>${top1[block]["Top1하단"]}</td>
+          <td>${(top1[block]["Top3상단"] || []).join(", ")}</td>
+          <td>${(top1[block]["Top3하단"] || []).join(", ")}</td>
         `;
-        tbody.appendChild(tr);
+        tbody.appendChild(row);
       }
     }
 
