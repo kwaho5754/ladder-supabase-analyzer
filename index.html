@@ -5,7 +5,7 @@
   <title>사다리 블럭 예측 결과</title>
   <style>
     body { font-family: "Noto Sans KR", sans-serif; background: #f4f7ff; padding: 2rem; }
-    h1 { text-align: center; font-size: 1.8rem; margin-bottom: 1.5rem; }
+    h1 { font-size: 1.8rem; text-align: center; margin-bottom: 2rem; }
     .summary-box {
       max-width: 600px; margin: 0 auto 2rem auto;
       background: #fff; border-radius: 10px;
@@ -41,7 +41,7 @@
         </tr>
       </thead>
       <tbody id="top1-summary-body">
-        <!-- JS에서 채움 -->
+        <!-- JavaScript로 채움 -->
       </tbody>
     </table>
   </div>
@@ -57,13 +57,17 @@
     ];
 
     const modeTitles = {
-      "3block": "3줄 블럭", "4block": "4줄 블럭",
-      "5block": "5줄 블럭", "6block": "6줄 블럭"
+      "3block": "3줄 블럭",
+      "4block": "4줄 블럭",
+      "5block": "5줄 블럭",
+      "6block": "6줄 블럭"
     };
 
     const transformLabel = {
-      "orig": "원본", "flip_start": "시작점 변형",
-      "flip_odd_even": "홀짝 변형", "flip_full": "완전 대칭"
+      "orig": "원본",
+      "flip_start": "시작점 변형",
+      "flip_odd_even": "홀짝 변형",
+      "flip_full": "완전 대칭"
     };
 
     const getModeKey = (mode) => mode.split("_")[0];

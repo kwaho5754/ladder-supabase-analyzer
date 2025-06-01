@@ -99,7 +99,7 @@ def predict_top1_summary():
         raw = response.data
         all_data = [convert(d) for d in raw]
 
-        modes = {
+        transform_modes = {
             "orig": lambda x: x,
             "flip_full": flip_full,
             "flip_start": flip_start,
@@ -107,17 +107,24 @@ def predict_top1_summary():
         }
 
         summary = {}
+
         for size in [3, 4, 5, 6]:
-            top_values, bottom_values = [], []
-            for mode_key, mode_fn in modes.items():
+            top_values = []
+            bottom_values = []
+
+            for transform_fn in transform_modes.values():
                 recent_block = all_data[:size]
-                flow = mode_fn(recent_block)
+                flow = transform_fn(recent_block)
                 top, bottom = find_all_matches(flow, all_data)
-                top_values.extend([x["값"] for x in top if x["값"] != "❌ 없음"])
-                bottom_values.extend([x["값"] for x in bottom if x["값"] != "❌ 없음"])
+                top_values += [v["값"] for v in top if v["값"] != "❌ 없음"]
+                bottom_values += [v["값"] for v in bottom if v["값"] != "❌ 없음"]
+
+            top_counter = Counter(top_values)
+            bottom_counter = Counter(bottom_values)
+
             summary[f"{size}줄"] = {
-                "Top1상단": Counter(top_values).most_common(1)[0][0] if top_values else "❌ 없음",
-                "Top1하단": Counter(bottom_values).most_common(1)[0][0] if bottom_values else "❌ 없음"
+                "Top1상단": top_counter.most_common(1)[0][0] if top_counter else "❌ 없음",
+                "Top1하단": bottom_counter.most_common(1)[0][0] if bottom_counter else "❌ 없음"
             }
 
         return jsonify({"Top1요약": summary})
