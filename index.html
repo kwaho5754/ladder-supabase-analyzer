@@ -12,35 +12,37 @@
     }
     h1 {
       font-size: 1.8rem;
-      margin-bottom: 2rem;
       text-align: center;
+      margin-bottom: 2rem;
     }
     h2 {
       margin-top: 2rem;
     }
     .section {
-      margin-bottom: 2.5rem;
+      margin-bottom: 3rem;
     }
-    .card-group {
+    .card-row {
       display: flex;
-      flex-wrap: wrap;
       gap: 1rem;
-      margin-top: 0.5rem;
+      flex-wrap: wrap;
     }
     .card {
       background: #fff;
       padding: 1rem;
       border-radius: 0.8rem;
       box-shadow: 0 0 8px rgba(0,0,0,0.1);
-      width: 260px;
+      width: 280px;
     }
     .card h3 {
-      margin: 0 0 0.5rem 0;
       font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .card h4 {
+      font-size: 0.95rem;
+      margin-top: 0.8rem;
     }
     .card ol {
       padding-left: 1.2rem;
-      margin-top: 0.5rem;
     }
     .card li {
       font-size: 0.9rem;
@@ -72,60 +74,73 @@
       "flip_full": "완전 대칭"
     };
 
-    const getModeKey = (mode) => mode.split("_")[0];
-
-    function createCardGroup(title, items) {
-      const wrapper = document.createElement("div");
-
-      const label = document.createElement("h3");
-      label.textContent = title;
-      wrapper.appendChild(label);
-
-      const group = document.createElement("div");
-      group.className = "card-group";
-
-      const card = document.createElement("div");
-      card.className = "card";
-
-      const list = document.createElement("ol");
-      for (const item of items) {
-        const li = document.createElement("li");
-        li.textContent = `${item["값"]} | 블럭: ${item["블럭"]} | 순번: ${item["순번"]}`;
-        list.appendChild(li);
-      }
-
-      card.appendChild(list);
-      group.appendChild(card);
-      wrapper.appendChild(group);
-
-      return wrapper;
-    }
+    const groupByBlockSize = {
+      "3block": [],
+      "4block": [],
+      "5block": []
+    };
 
     async function loadResults() {
-      const resultContainer = document.getElementById("results");
-
       for (const mode of modes) {
         try {
           const res = await fetch(`/predict?mode=${mode}`);
           const data = await res.json();
-
-          const section = document.createElement("div");
-          section.className = "section";
-
-          const mkey = getModeKey(mode);
-          const typeKey = mode.split("_").slice(1).join("_");
-
-          const title = document.createElement("h2");
-          title.textContent = `${modeTitles[mkey]} (${transformLabel[typeKey]}) - 회차 ${data["예측회차"]}`;
-          section.appendChild(title);
-
-          section.appendChild(createCardGroup("🔺 상단값 예측", data["상단값들"]));
-          section.appendChild(createCardGroup("🔻 하단값 예측", data["하단값들"]));
-
-          resultContainer.appendChild(section);
+          groupByBlockSize[mode.slice(0, 7)].push({ mode, data });
         } catch (e) {
-          console.error(`❌ ${mode} 예측 오류`, e);
+          console.error("❌ 실패:", mode, e);
         }
+      }
+
+      const resultContainer = document.getElementById("results");
+
+      for (const blockKey of Object.keys(groupByBlockSize)) {
+        const section = document.createElement("div");
+        section.className = "section";
+
+        const title = document.createElement("h2");
+        title.textContent = modeTitles[blockKey];
+        section.appendChild(title);
+
+        const row = document.createElement("div");
+        row.className = "card-row";
+
+        for (const { mode, data } of groupByBlockSize[blockKey]) {
+          const card = document.createElement("div");
+          card.className = "card";
+
+          const mkey = mode.split("_")[1];
+          const label = document.createElement("h3");
+          label.textContent = `${transformLabel[mkey]} (회차 ${data["예측회차"]})`;
+          card.appendChild(label);
+
+          const topList = document.createElement("ol");
+          for (const item of data["상단값들"]) {
+            const li = document.createElement("li");
+            li.textContent = `${item["값"]} | 블럭: ${item["블럭"]} | 순번: ${item["순번"]}`;
+            topList.appendChild(li);
+          }
+
+          const bottomList = document.createElement("ol");
+          for (const item of data["하단값들"]) {
+            const li = document.createElement("li");
+            li.textContent = `${item["값"]} | 블럭: ${item["블럭"]} | 순번: ${item["순번"]}`;
+            bottomList.appendChild(li);
+          }
+
+          const topLabel = document.createElement("h4");
+          topLabel.textContent = "🔺 상단값 예측";
+          const bottomLabel = document.createElement("h4");
+          bottomLabel.textContent = "🔻 하단값 예측";
+
+          card.appendChild(topLabel);
+          card.appendChild(topList);
+          card.appendChild(bottomLabel);
+          card.appendChild(bottomList);
+          row.appendChild(card);
+        }
+
+        section.appendChild(row);
+        resultContainer.appendChild(section);
       }
     }
 

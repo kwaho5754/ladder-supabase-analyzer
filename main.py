@@ -4,20 +4,17 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 import os
 
-# .env 환경변수 로드
 load_dotenv()
 
 app = Flask(__name__)
 CORS(app)
 
-# Supabase 연결 정보
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 SUPABASE_TABLE = os.environ.get("SUPABASE_TABLE", "ladder")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 사다리 결과값 변환
 def convert(entry):
     side = '좌' if entry['start_point'] == 'LEFT' else '우'
     count = str(entry['line_count'])
@@ -28,56 +25,37 @@ def parse_block(s):
     return s[0], s[1:-1], s[-1]
 
 def flip_full(block):
-    return [
-        ('우' if s == '좌' else '좌') + c + ('짝' if o == '홀' else '홀')
-        for s, c, o in map(parse_block, block)
-    ]
+    return [('우' if s == '좌' else '좌') + c + ('짝' if o == '홀' else '홀')
+            for s, c, o in map(parse_block, block)]
 
 def flip_start(block):
-    return [
-        s + ('4' if c == '3' else '3') + ('홀' if o == '짝' else '짝')
-        for s, c, o in map(parse_block, block)
-    ]
+    return [s + ('4' if c == '3' else '3') + ('홀' if o == '짝' else '짝')
+            for s, c, o in map(parse_block, block)]
 
 def flip_odd_even(block):
-    return [
-        ('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o
-        for s, c, o in map(parse_block, block)
-    ]
+    return [('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o
+            for s, c, o in map(parse_block, block)]
 
-def find_top_matches(block, full_data):
+def find_matches(block, full_data, direction="top"):
     matches = []
     block_len = len(block)
     for i in reversed(range(len(full_data) - block_len)):
         candidate = full_data[i:i + block_len]
         if candidate == block:
-            pred_index = i - 1
-            pred = full_data[pred_index] if pred_index >= 0 else "❌ 없음"
+            if direction == "top":
+                pred_index = i - 1
+            else:
+                pred_index = i + block_len
+            if 0 <= pred_index < len(full_data):
+                pred = full_data[pred_index]
+            else:
+                pred = "❌ 없음"
             matches.append({
                 "값": pred,
                 "블럭": ">".join(block),
                 "순번": i + 1
             })
-    return matches[:5] if matches else [{
-        "값": "❌ 없음",
-        "블럭": ">".join(block),
-        "순번": "❌"
-    }]
-
-def find_bottom_matches(block, full_data):
-    matches = []
-    block_len = len(block)
-    for i in reversed(range(len(full_data) - block_len)):
-        candidate = full_data[i:i + block_len]
-        if candidate == block:
-            pred_index = i + block_len
-            pred = full_data[pred_index] if pred_index < len(full_data) else "❌ 없음"
-            matches.append({
-                "값": pred,
-                "블럭": ">".join(block),
-                "순번": i + 1
-            })
-    return matches[:5] if matches else [{
+    return sorted(matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else -1, reverse=True)[:5] or [{
         "값": "❌ 없음",
         "블럭": ">".join(block),
         "순번": "❌"
@@ -93,16 +71,9 @@ def predict():
         mode = request.args.get("mode", "3block_orig")
         size = int(mode[0])
 
-        response = supabase.table(SUPABASE_TABLE) \
-            .select("*") \
-            .order("reg_date", desc=True) \
-            .order("date_round", desc=True) \
-            .limit(3000) \
-            .execute()
-
+        response = supabase.table(SUPABASE_TABLE).select("*").order("reg_date", desc=True).order("date_round", desc=True).limit(3000).execute()
         raw = response.data
         round_num = int(raw[0]["date_round"]) + 1
-
         all_data = [convert(d) for d in raw]
         recent_flow = all_data[:size]
 
@@ -115,13 +86,13 @@ def predict():
         else:
             flow = recent_flow
 
-        top_matches = find_top_matches(flow, all_data)
-        bottom_matches = find_bottom_matches(flow, all_data)
+        top = find_matches(flow, all_data, "top")
+        bottom = find_matches(flow, all_data, "bottom")
 
         return jsonify({
             "예측회차": round_num,
-            "상단값들": top_matches,
-            "하단값들": bottom_matches
+            "상단값들": top,
+            "하단값들": bottom
         })
 
     except Exception as e:
