@@ -35,34 +35,49 @@ def flip_odd_even(block):
     return [('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o for s, c, o in map(parse_block, block)]
 
 def find_all_matches(block, full_data):
-    matches = []
+    top_matches = []
+    bottom_matches = []
     block_len = len(block)
 
     for i in reversed(range(len(full_data) - block_len)):
         candidate = full_data[i:i + block_len]
         if candidate == block:
-            pred_index = i - 1
-            pred = full_data[pred_index] if pred_index >= 0 else "❌ 없음"
-            matches.append({
-                "값": pred,
+            # 상단값
+            top_index = i - 1
+            top_pred = full_data[top_index] if top_index >= 0 else "❌ 없음"
+            top_matches.append({
+                "값": top_pred,
                 "블럭": ">".join(block),
                 "순번": i + 1
             })
 
-    if not matches:
-        matches.append({
+            # 하단값
+            bottom_index = i + block_len
+            bottom_pred = full_data[bottom_index] if bottom_index < len(full_data) else "❌ 없음"
+            bottom_matches.append({
+                "값": bottom_pred,
+                "블럭": ">".join(block),
+                "순번": i + 1
+            })
+
+    if not top_matches:
+        top_matches.append({
+            "값": "❌ 없음",
+            "블럭": ">".join(block),
+            "순번": "❌"
+        })
+    if not bottom_matches:
+        bottom_matches.append({
             "값": "❌ 없음",
             "블럭": ">".join(block),
             "순번": "❌"
         })
 
-    # ✅ 순번 낮은 값이 위쪽에 오도록 정렬 (사람 시선 기준)
-    matches = sorted(
-        matches,
-        key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999
-    )[:5]
+    # ✅ 정렬: 순번 낮은 게 위 (사람 시선 기준)
+    top_matches = sorted(top_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
+    bottom_matches = sorted(bottom_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
 
-    return matches
+    return top_matches, bottom_matches
 
 @app.route("/")
 def home():
@@ -98,11 +113,12 @@ def predict():
         else:
             flow = recent_flow
 
-        matches = find_all_matches(flow, all_data)
+        top, bottom = find_all_matches(flow, all_data)
 
         return jsonify({
             "예측회차": round_num,
-            "예측값들": matches
+            "상단값들": top,
+            "하단값들": bottom
         })
 
     except Exception as e:
