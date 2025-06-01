@@ -7,7 +7,7 @@
     body { font-family: "Noto Sans KR", sans-serif; background: #f4f7ff; padding: 2rem; }
     h1 { font-size: 1.8rem; text-align: center; margin-bottom: 2rem; }
     .summary-box {
-      max-width: 800px; margin: 0 auto 2rem auto;
+      max-width: 700px; margin: 0 auto 2rem auto;
       background: #fff; border-radius: 10px;
       box-shadow: 0 0 6px rgba(0,0,0,0.1); padding: 1rem;
     }
@@ -31,7 +31,8 @@
 <body>
   <h1>🔮 사다리 블럭 예측 결과</h1>
 
-  <div class="summary-box" id="top1-summary-box">
+  <!-- ✅ Top3 요약 테이블 (3줄 블럭, 원본 제외) -->
+  <div class="summary-box">
     <table>
       <thead>
         <tr>
@@ -40,8 +41,8 @@
           <th>Top3 하단값</th>
         </tr>
       </thead>
-      <tbody id="top1-summary-body">
-        <!-- JavaScript로 채움 -->
+      <tbody id="top3-summary-body">
+        <!-- JS에서 채워짐 -->
       </tbody>
     </table>
   </div>
@@ -106,21 +107,19 @@
       return card;
     }
 
-    async function loadTop1Summary() {
-      const res = await fetch("/predict_top1_summary");
+    async function loadTop3Summary() {
+      const res = await fetch("/predict_top3_summary");
       const data = await res.json();
-      const top1 = data["Top1요약"] || {};
-      const tbody = document.getElementById("top1-summary-body");
+      const info = data["3줄 블럭 Top3 요약"];
+      const tbody = document.getElementById("top3-summary-body");
 
-      for (const block in top1) {
-        const row = document.createElement("tr");
-        row.innerHTML = `
-          <td>${block}</td>
-          <td>${(top1[block]["Top3상단"] || []).join(", ")}</td>
-          <td>${(top1[block]["Top3하단"] || []).join(", ")}</td>
-        `;
-        tbody.appendChild(row);
-      }
+      const row = document.createElement("tr");
+      row.innerHTML = `
+        <td>3줄 블럭</td>
+        <td>${info["Top3상단"].join(", ")}</td>
+        <td>${info["Top3하단"].join(", ")}</td>
+      `;
+      tbody.appendChild(row);
     }
 
     async function loadResults() {
@@ -156,7 +155,7 @@
       }
     }
 
-    loadTop1Summary();
+    loadTop3Summary();
     loadResults();
   </script>
 </body>
