@@ -72,9 +72,48 @@ def find_all_matches(block, full_data):
 def home():
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
+@app.route("/predict")
+def predict():
+    try:
+        mode = request.args.get("mode", "3block_orig")
+        size = int(mode[0])
+
+        response = supabase.table(SUPABASE_TABLE) \
+            .select("*") \
+            .order("reg_date", desc=True) \
+            .order("date_round", desc=True) \
+            .limit(3000) \
+            .execute()
+
+        raw = response.data
+        round_num = int(raw[0]["date_round"]) + 1
+        all_data = [convert(d) for d in raw]
+        recent_flow = all_data[:size]
+
+        if "flip_full" in mode:
+            flow = flip_full(recent_flow)
+        elif "flip_start" in mode:
+            flow = flip_start(recent_flow)
+        elif "flip_odd_even" in mode:
+            flow = flip_odd_even(recent_flow)
+        else:
+            flow = recent_flow
+
+        top, bottom = find_all_matches(flow, all_data)
+
+        return jsonify({
+            "예측회차": round_num,
+            "상단값들": top,
+            "하단값들": bottom
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
+
 @app.route("/predict_top3_summary")
 def predict_top3_summary():
     try:
+        from itertools import chain
         response = supabase.table(SUPABASE_TABLE) \
             .select("*") \
             .order("reg_date", desc=True) \
@@ -85,70 +124,34 @@ def predict_top3_summary():
         raw = response.data
         all_data = [convert(d) for d in raw]
 
-        transform_modes = {
-            "flip_full": flip_full,
-            "flip_start": flip_start,
-            "flip_odd_even": flip_odd_even
-        }
+        result = {}
 
-        valid_values = {"좌3홀", "좌3짝", "우3홀", "우3짝"}
-        summary_result = {}
-
-        def analyze(size):
+        for size in [3, 4]:  # 3줄 + 4줄 블럭 포함
             recent_block = all_data[:size]
+            transform_modes = {
+                "flip_full": flip_full,
+                "flip_start": flip_start,
+                "flip_odd_even": flip_odd_even
+            }
+
             top_values = []
+            bottom_values = []
 
             for fn in transform_modes.values():
                 flow = fn(recent_block)
-                top, _ = find_all_matches(flow, all_data)
-                top_values += [t["값"] for t in top if t["값"] in valid_values]
+                top, bottom = find_all_matches(flow, all_data)
+                top_values += [t["값"] for t in top if t["값"] != "❌ 없음"]
+                bottom_values += [b["값"] for b in bottom if b["값"] != "❌ 없음"]
 
-            counter = Counter(top_values)
-            total = sum(counter.values())
-            if len(counter) < 4 or total == 0:
-                return {
-                    "예측그룹(3/4)": [],
-                    "❌ 제외값": "❌ 부족",
-                    "총합": 0,
-                    "설명": "데이터 부족"
-                }
+            top_counter = Counter(top_values)
+            bottom_counter = Counter(bottom_values)
 
-            excluded = min(counter.items(), key=lambda x: x[1])[0]
-            filtered = {k: v for k, v in counter.items() if k != excluded}
-            sorted_top3 = sorted(filtered.items(), key=lambda x: x[1], reverse=True)
-            group = [f"{k}({round(v / total * 100)}%)" for k, v in sorted_top3]
-            excluded_ratio = f"{excluded}({round(counter[excluded] / total * 100)}%)"
-
-            max_ratio = max(filtered.values()) / total
-            comment = "편중 경향 있음" if max_ratio >= 0.5 else "분산되어 안정적"
-
-            return {
-                "예측그룹(3/4)": group,
-                "❌ 제외값": excluded_ratio,
-                "총합": total,
-                "설명": comment
+            result[f"{size}줄 블럭 Top3 요약"] = {
+                "Top3상단": [v[0] for v in top_counter.most_common(3)],
+                "Top3하단": [v[0] for v in bottom_counter.most_common(3)]
             }
 
-        result_3 = analyze(3)
-        result_4 = analyze(4)
-
-        final_comment = "3줄 블럭이 더 우세합니다" if result_3["총합"] > result_4["총합"] else "4줄 블럭이 더 우세합니다"
-        if result_3["총합"] == result_4["총합"]:
-            final_comment = "두 블럭 흐름이 비슷합니다"
-
-        return jsonify({
-            "3줄 블럭 요약": {
-                "예측그룹(3/4)": result_3["예측그룹(3/4)"],
-                "❌ 제외값": result_3["❌ 제외값"],
-                "설명": result_3["설명"]
-            },
-            "4줄 블럭 요약": {
-                "예측그룹(3/4)": result_4["예측그룹(3/4)"],
-                "❌ 제외값": result_4["❌ 제외값"],
-                "설명": result_4["설명"]
-            },
-            "비교 결과": final_comment
-        })
+        return jsonify(result)
 
     except Exception as e:
         return jsonify({"error": str(e)})
