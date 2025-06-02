@@ -4,41 +4,81 @@
   <meta charset="UTF-8" />
   <title>사다리 블럭 예측 결과</title>
   <style>
-    body { font-family: "Noto Sans KR", sans-serif; background: #f4f7ff; padding: 2rem; }
-    h1 { font-size: 1.8rem; text-align: center; margin-bottom: 2rem; }
+    body {
+      font-family: "Noto Sans KR", sans-serif;
+      background: #f4f7ff;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 1.8rem;
+      text-align: center;
+      margin-bottom: 2rem;
+    }
     .summary-box {
-      max-width: 700px; margin: 0 auto 2rem auto;
-      background: #fff; border-radius: 10px;
-      box-shadow: 0 0 6px rgba(0,0,0,0.1); padding: 1rem;
+      max-width: 800px;
+      margin: 0 auto 2rem auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 0 6px rgba(0,0,0,0.1);
+      padding: 1rem;
     }
-    .summary-box table { width: 100%; border-collapse: collapse; }
+    .summary-box table {
+      width: 100%;
+      border-collapse: collapse;
+    }
     .summary-box th, .summary-box td {
-      padding: 0.6rem; border-bottom: 1px solid #ddd; text-align: center;
+      padding: 0.6rem;
+      border-bottom: 1px solid #ddd;
+      text-align: center;
     }
-    .summary-box th { background: #eef2ff; }
-    .section { margin-bottom: 3rem; }
-    .card-row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .summary-box th {
+      background: #eef2ff;
+    }
+    .section {
+      margin-bottom: 3rem;
+    }
+    .card-row {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
     .card {
-      background: #fff; padding: 1rem; border-radius: 0.8rem;
-      box-shadow: 0 0 8px rgba(0,0,0,0.1); width: 280px;
+      background: #fff;
+      padding: 1rem;
+      border-radius: 0.8rem;
+      box-shadow: 0 0 8px rgba(0,0,0,0.1);
+      width: 280px;
     }
-    .card h3 { font-size: 1rem; margin-bottom: 0.5rem; }
-    .card h4 { font-size: 0.95rem; margin-top: 0.8rem; margin-bottom: 0.4rem; }
-    .card ol { padding-left: 1.2rem; }
-    .card li { font-size: 0.9rem; margin-bottom: 0.4rem; }
+    .card h3 {
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+    .card h4 {
+      font-size: 0.95rem;
+      margin-top: 0.8rem;
+      margin-bottom: 0.4rem;
+    }
+    .card ol {
+      padding-left: 1.2rem;
+    }
+    .card li {
+      font-size: 0.9rem;
+      margin-bottom: 0.4rem;
+    }
   </style>
 </head>
 <body>
   <h1>🔮 사다리 블럭 예측 결과</h1>
 
-  <!-- ✅ Top3 요약 테이블 (3줄 + 4줄 블럭, 원본 제외) -->
+  <!-- ✅ 수정된 상단 요약 테이블 -->
   <div class="summary-box">
     <table>
       <thead>
         <tr>
           <th>블럭</th>
-          <th>Top3 상단값</th>
-          <th>Top3 하단값</th>
+          <th>우세 계열 흐름</th>
+          <th>포함 예시</th>
+          <th>성공 여부</th>
         </tr>
       </thead>
       <tbody id="top3-summary-body">
@@ -47,6 +87,7 @@
     </table>
   </div>
 
+  <!-- 기존 예측 결과 카드 -->
   <div id="results"></div>
 
   <script>
@@ -58,13 +99,17 @@
     ];
 
     const modeTitles = {
-      "3block": "3줄 블럭", "4block": "4줄 블럭",
-      "5block": "5줄 블럭", "6block": "6줄 블럭"
+      "3block": "3줄 블럭",
+      "4block": "4줄 블럭",
+      "5block": "5줄 블럭",
+      "6block": "6줄 블럭"
     };
 
     const transformLabel = {
-      "orig": "원본", "flip_start": "시작점 변형",
-      "flip_odd_even": "홀짝 변형", "flip_full": "완전 대칭"
+      "orig": "원본",
+      "flip_start": "시작점 변형",
+      "flip_odd_even": "홀짝 변형",
+      "flip_full": "완전 대칭"
     };
 
     const getModeKey = (mode) => mode.split("_")[0];
@@ -111,14 +156,15 @@
       const res = await fetch("/predict_top3_summary");
       const data = await res.json();
       const tbody = document.getElementById("top3-summary-body");
+      tbody.innerHTML = "";
 
-      for (const key of Object.keys(data)) {
-        const info = data[key];
+      for (const key in data) {
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${key.replace(" Top3 요약", "")}</td>
-          <td>${info["Top3상단"].join(", ")}</td>
-          <td>${info["Top3하단"].join(", ")}</td>
+          <td>${key}</td>
+          <td>${data[key].계열}</td>
+          <td>${data[key].예시}</td>
+          <td>${data[key].성공여부}</td>
         `;
         tbody.appendChild(row);
       }
