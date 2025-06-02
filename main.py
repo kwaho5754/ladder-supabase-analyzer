@@ -36,6 +36,7 @@ def flip_odd_even(block):
 
 def find_all_matches(block, full_data):
     top_matches = []
+    bottom_matches = []
     block_len = len(block)
 
     for i in reversed(range(len(full_data) - block_len)):
@@ -43,22 +44,71 @@ def find_all_matches(block, full_data):
         if candidate == block:
             top_index = i - 1
             top_pred = full_data[top_index] if top_index >= 0 else "❌ 없음"
-            top_matches.append(top_pred)
+            top_matches.append({
+                "값": top_pred,
+                "블럭": ">".join(block),
+                "순번": i + 1
+            })
 
-    return [v for v in top_matches if v != "❌ 없음"]
+            bottom_index = i + block_len
+            bottom_pred = full_data[bottom_index] if bottom_index < len(full_data) else "❌ 없음"
+            bottom_matches.append({
+                "값": bottom_pred,
+                "블럭": ">".join(block),
+                "순번": i + 1
+            })
 
-def group_by_flow(values):
-    groups = {
-        "좌3짝계열": ["좌삼짝", "좌사홀", "우사짝"],
-        "우3홀계열": ["우삼홀", "우사홀", "좌삼홀"],
-        "좌4홀계열": ["좌사홀", "우사홀", "좌오홀"],
-        "우4짝계열": ["우사짝", "우오짝", "좌사짝"]
-    }
-    result = {}
-    for name, patterns in groups.items():
-        count = sum(1 for v in values if v in patterns)
-        result[name] = {"포함수": count, "예시": patterns}
-    return result
+    if not top_matches:
+        top_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
+    if not bottom_matches:
+        bottom_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
+
+    top_matches = sorted(top_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
+    bottom_matches = sorted(bottom_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
+
+    return top_matches, bottom_matches
+
+@app.route("/")
+def home():
+    return send_from_directory(os.path.dirname(__file__), "index.html")
+
+@app.route("/predict")
+def predict():
+    try:
+        mode = request.args.get("mode", "3block_orig")
+        size = int(mode[0])
+
+        response = supabase.table(SUPABASE_TABLE) \
+            .select("*") \
+            .order("reg_date", desc=True) \
+            .order("date_round", desc=True) \
+            .limit(3000) \
+            .execute()
+
+        raw = response.data
+        round_num = int(raw[0]["date_round"]) + 1
+        all_data = [convert(d) for d in raw]
+        recent_flow = all_data[:size]
+
+        if "flip_full" in mode:
+            flow = flip_full(recent_flow)
+        elif "flip_start" in mode:
+            flow = flip_start(recent_flow)
+        elif "flip_odd_even" in mode:
+            flow = flip_odd_even(recent_flow)
+        else:
+            flow = recent_flow
+
+        top, bottom = find_all_matches(flow, all_data)
+
+        return jsonify({
+            "예측회차": round_num,
+            "상단값들": top,
+            "하단값들": bottom
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)})
 
 @app.route("/predict_top3_summary")
 def predict_top3_summary():
@@ -72,6 +122,19 @@ def predict_top3_summary():
 
         raw = response.data
         all_data = [convert(d) for d in raw]
+
+        def group_by_flow(values):
+            groups = {
+                "좌3짝계열": ["좌삼짝", "좌사홀", "우사짝"],
+                "우3홀계열": ["우삼홀", "우사홀", "좌삼홀"],
+                "좌4홀계열": ["좌사홀", "우사홀", "좌오홀"],
+                "우4짝계열": ["우사짝", "우오짝", "좌사짝"]
+            }
+            result = {}
+            for name, patterns in groups.items():
+                count = sum(1 for v in values if v in patterns)
+                result[name] = {"포함수": count, "예시": patterns}
+            return result
 
         summary = {}
 
@@ -87,7 +150,8 @@ def predict_top3_summary():
             top_values = []
             for fn in transform_modes:
                 flow = fn(recent_block)
-                top_values += find_all_matches(flow, all_data)
+                top, _ = find_all_matches(flow, all_data)
+                top_values += [t["값"] for t in top if t["값"] != "❌ 없음"]
 
             grouped = group_by_flow(top_values)
             best_group = max(grouped.items(), key=lambda x: x[1]["포함수"])
