@@ -123,47 +123,41 @@ def predict_top3_summary():
         raw = response.data
         all_data = [convert(d) for d in raw]
 
-        def group_by_flow(values):
-            groups = {
-                "좌3짝계열": ["좌삼짝", "좌사홀", "우사짝"],
-                "우3홀계열": ["우삼홀", "우사홀", "좌삼홀"],
-                "좌4홀계열": ["좌사홀", "우사홀", "좌오홀"],
-                "우4짝계열": ["우사짝", "우오짝", "좌사짝"]
-            }
-            result = {}
-            for name, patterns in groups.items():
-                count = sum(1 for v in values if v in patterns)
-                result[name] = {"포함수": count, "예시": patterns}
-            return result
+        transform_modes = {
+            "flip_full": flip_full,
+            "flip_start": flip_start,
+            "flip_odd_even": flip_odd_even
+        }
 
-        summary = {}
+        valid_values = {"좌3홀", "좌3짝", "우3홀", "우3짝"}
+
+        top_values = []
 
         for size in [3, 4]:
             recent_block = all_data[:size]
-            transform_modes = [
-                lambda b: b,
-                flip_full,
-                flip_start,
-                flip_odd_even
-            ]
-
-            top_values = []
-            for fn in transform_modes:
+            for fn in transform_modes.values():
                 flow = fn(recent_block)
                 top, _ = find_all_matches(flow, all_data)
-                top_values += [t["값"] for t in top if t["값"] != "❌ 없음"]
+                top_values += [t["값"] for t in top if t["값"] in valid_values]
 
-            grouped = group_by_flow(top_values)
-            best_group = max(grouped.items(), key=lambda x: x[1]["포함수"])
-            계열명, 내용 = best_group
-            summary[f"{size}줄 블럭"] = {
-                "계열": 계열명,
-                "포함수": 내용["포함수"],
-                "예시": ", ".join(내용["예시"]),
-                "성공여부": "✅" if 내용["포함수"] >= 2 else "❌"
+        counter = Counter(top_values)
+        total = sum(counter.values())
+
+        if len(counter) < 4:
+            return jsonify({"요약": "데이터 부족"})
+
+        excluded = min(counter.items(), key=lambda x: x[1])[0]
+        filtered = {k: v for k, v in counter.items() if k != excluded}
+        sorted_top3 = sorted(filtered.items(), key=lambda x: x[1], reverse=True)
+
+        summary = [f"{k}({round(v/total*100)}%)" for k, v in sorted_top3]
+
+        return jsonify({
+            "3~4줄 블럭 상단 예측": {
+                "예측그룹(3/4)": summary,
+                "❌ 제외값": f"{excluded}({round(counter[excluded]/total*100)}%)"
             }
-
-        return jsonify(summary)
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)})
