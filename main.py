@@ -58,7 +58,7 @@ def predict_top3_summary():
         raw = response.data
         all_data = [convert(d) for d in raw]
 
-        block = all_data[:4]  # 4줄 블럭
+        block = all_data[:3]  # 3줄 블럭로 변경
         flow = block  # 정방향만 사용
 
         predictions = find_all_matches(flow, all_data)
@@ -76,7 +76,7 @@ def predict_top3_summary():
         result = {
             "예측 그룹 (3/4)": [f"{k} ({counter[k]}회)" for k in group],
             "제외값": f"{excluded} ({counter[excluded]}회)",
-            "설명": "4줄 블럭 기준 정방향 흐름 기반 예측"
+            "설명": "3줄 블럭 기준 정방향 흐름 기반 예측"
         }
 
         return jsonify(result)
