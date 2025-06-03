@@ -1,61 +1,56 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <title>사다리 블럭 예측 결과</title>
+  <meta charset="UTF-8">
+  <title>4줄 블럭 예측 요약</title>
   <style>
-    body { font-family: "Noto Sans KR", sans-serif; background: #f4f7ff; padding: 2rem; }
-    h1 { font-size: 1.8rem; text-align: center; margin-bottom: 2rem; }
-    .summary-box {
-      max-width: 800px; margin: 0 auto 2rem auto;
-      background: #fff; border-radius: 10px;
-      box-shadow: 0 0 6px rgba(0,0,0,0.1); padding: 1rem;
-    }
-    .summary-box table { width: 100%; border-collapse: collapse; }
-    .summary-box th, .summary-box td {
-      padding: 0.6rem; border-bottom: 1px solid #ddd; text-align: center;
-    }
-    .summary-box th { background: #eef2ff; }
-    .summary-comment { text-align: center; margin-top: 1rem; font-weight: bold; color: #333; }
+    body { font-family: 'Noto Sans KR', sans-serif; background: #f4f7ff; padding: 2rem; }
+    h1 { text-align: center; margin-bottom: 2rem; }
+    table { width: 100%; max-width: 800px; margin: auto; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    th, td { padding: 0.8rem; text-align: center; border-bottom: 1px solid #ddd; }
+    th { background-color: #e8f0fe; font-weight: bold; }
+    tr:last-child td { border-bottom: none; }
+    .loading { text-align: center; color: #666; }
   </style>
 </head>
 <body>
-  <h1>🔮 사다리 블럭 예측 결과</h1>
+  <h1>🔮 4줄 블럭 기반 75% 예측 요약</h1>
 
-  <div class="summary-box">
-    <table>
-      <thead>
-        <tr>
-          <th>블럭</th>
-          <th>예측 그룹 (3/4)</th>
-          <th>❌ 제외값</th>
-          <th>설명</th>
-        </tr>
-      </thead>
-      <tbody id="top3-summary-body">
-        <!-- 채워짐 -->
-      </tbody>
-    </table>
-  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>예측 그룹 (3/4)</th>
+        <th>❌ 제외값</th>
+        <th>설명</th>
+      </tr>
+    </thead>
+    <tbody id="summary-body">
+      <tr><td class="loading" colspan="3">불러오는 중...</td></tr>
+    </tbody>
+  </table>
 
   <script>
-    async function loadTop3Summary() {
-      const res = await fetch("/predict_top3_summary");
-      const data = await res.json();
-      const tbody = document.getElementById("top3-summary-body");
+    async function loadSummary() {
+      try {
+        const res = await fetch("/predict_top3_summary");
+        const data = await res.json();
 
-      const info = data["4줄 블럭 요약"];
-      const row = document.createElement("tr");
-      row.innerHTML = `
-        <td>4줄 블럭</td>
-        <td>${info["예측그룹(3/4)"].join(", ")}</td>
-        <td>${info["❌ 제외값"]}</td>
-        <td>${info["설명"]}</td>
-      `;
-      tbody.appendChild(row);
+        const tbody = document.getElementById("summary-body");
+        tbody.innerHTML = "";
+
+        const row = document.createElement("tr");
+        row.innerHTML = `
+          <td>${(data["예측 그룹 (3/4)"] || []).join('<br>')}</td>
+          <td>${data["제외값"] || "-"}</td>
+          <td>${data["설명"] || ""}</td>
+        `;
+        tbody.appendChild(row);
+      } catch (e) {
+        document.getElementById("summary-body").innerHTML = `<tr><td colspan="3">예측 정보를 불러오지 못했습니다.</td></tr>`;
+      }
     }
 
-    loadTop3Summary();
+    loadSummary();
   </script>
 </body>
 </html>

@@ -28,45 +28,18 @@ def parse_block(s):
 def flip_full(block):
     return [('우' if s == '좌' else '좌') + c + ('짝' if o == '홀' else '홀') for s, c, o in map(parse_block, block)]
 
-def flip_start(block):
-    return [s + ('4' if c == '3' else '3') + ('홀' if o == '짝' else '짝') for s, c, o in map(parse_block, block)]
-
-def flip_odd_even(block):
-    return [('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o for s, c, o in map(parse_block, block)]
-
 def find_all_matches(block, full_data):
-    top_matches = []
-    bottom_matches = []
+    matches = []
     block_len = len(block)
 
     for i in reversed(range(len(full_data) - block_len)):
         candidate = full_data[i:i + block_len]
         if candidate == block:
             top_index = i - 1
-            top_pred = full_data[top_index] if top_index >= 0 else "❌ 없음"
-            top_matches.append({
-                "값": top_pred,
-                "블럭": ">".join(block),
-                "순번": i + 1
-            })
+            if 0 <= top_index < len(full_data):
+                matches.append(full_data[top_index])
 
-            bottom_index = i + block_len
-            bottom_pred = full_data[bottom_index] if bottom_index < len(full_data) else "❌ 없음"
-            bottom_matches.append({
-                "값": bottom_pred,
-                "블럭": ">".join(block),
-                "순번": i + 1
-            })
-
-    if not top_matches:
-        top_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
-    if not bottom_matches:
-        bottom_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
-
-    top_matches = sorted(top_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:10]
-    bottom_matches = sorted(bottom_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:10]
-
-    return top_matches, bottom_matches
+    return matches[:10]  # 상위 10개 예측값만 수집
 
 @app.route("/")
 def home():
@@ -79,50 +52,34 @@ def predict_top3_summary():
             .select("*") \
             .order("reg_date", desc=True) \
             .order("date_round", desc=True) \
-            .limit(3000) \
+            .limit(5000) \
             .execute()
 
         raw = response.data
         all_data = [convert(d) for d in raw]
 
-        transform_modes = {
-            "flip_full": flip_full,
-            "flip_start": flip_start,
-            "flip_odd_even": flip_odd_even
-        }
+        block = all_data[:4]  # 4줄 블럭
+        flow = block  # 정방향만 사용
+
+        predictions = find_all_matches(flow, all_data)
 
         valid_values = {"좌3홀", "좌3짝", "우3홀", "우3짝"}
-        score_dict = {}
+        filtered = [p for p in predictions if p in valid_values]
 
-        recent_block = all_data[:4]
-        for fn in transform_modes.values():
-            flow = fn(recent_block)
-            top, _ = find_all_matches(flow, all_data)
-            for idx, match in enumerate(top):
-                val = match["값"]
-                if val in valid_values:
-                    score = 10 - idx  # 순위 가중치
-                    score_dict[val] = score_dict.get(val, 0) + score
+        if len(set(filtered)) < 4:
+            return jsonify({"예측 그룹 (3/4)": [], "제외값": "부족", "설명": "데이터 부족"})
 
-        if len(score_dict) < 4:
-            return jsonify({"4줄 블럭 요약": {"예측그룹(3/4)": [], "❌ 제외값": "부족", "설명": "데이터 부족"}})
+        counter = Counter(filtered)
+        excluded = min(counter.items(), key=lambda x: x[1])[0]
+        group = [k for k in counter if k != excluded]
 
-        excluded = min(score_dict.items(), key=lambda x: x[1])[0]
-        filtered = {k: v for k, v in score_dict.items() if k != excluded}
-        sorted_top3 = sorted(filtered.items(), key=lambda x: x[1], reverse=True)
+        result = {
+            "예측 그룹 (3/4)": [f"{k} ({counter[k]}회)" for k in group],
+            "제외값": f"{excluded} ({counter[excluded]}회)",
+            "설명": "4줄 블럭 기준 정방향 흐름 기반 예측"
+        }
 
-        group = [f"{k}({v}점)" for k, v in sorted_top3]
-        excluded_score = f"{excluded}({score_dict[excluded]}점)"
-        max_score = max(filtered.values())
-        comment = "편중 경향 있음" if max_score >= sum(filtered.values()) * 0.6 else "분산되어 안정적"
-
-        return jsonify({
-            "4줄 블럭 요약": {
-                "예측그룹(3/4)": group,
-                "❌ 제외값": excluded_score,
-                "설명": comment
-            }
-        })
+        return jsonify(result)
 
     except Exception as e:
         return jsonify({"error": str(e)})
