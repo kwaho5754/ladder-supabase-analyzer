@@ -63,8 +63,8 @@ def find_all_matches(block, full_data):
     if not bottom_matches:
         bottom_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
 
-    top_matches = sorted(top_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:11]
-    bottom_matches = sorted(bottom_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:11]
+    top_matches = sorted(top_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:10]
+    bottom_matches = sorted(bottom_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:10]
 
     return top_matches, bottom_matches
 
@@ -72,48 +72,9 @@ def find_all_matches(block, full_data):
 def home():
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
-@app.route("/predict")
-def predict():
-    try:
-        mode = request.args.get("mode", "3block_orig")
-        size = int(mode[0])
-
-        response = supabase.table(SUPABASE_TABLE) \
-            .select("*") \
-            .order("reg_date", desc=True) \
-            .order("date_round", desc=True) \
-            .limit(3000) \
-            .execute()
-
-        raw = response.data
-        round_num = int(raw[0]["date_round"]) + 1
-        all_data = [convert(d) for d in raw]
-        recent_flow = all_data[:size]
-
-        if "flip_full" in mode:
-            flow = flip_full(recent_flow)
-        elif "flip_start" in mode:
-            flow = flip_start(recent_flow)
-        elif "flip_odd_even" in mode:
-            flow = flip_odd_even(recent_flow)
-        else:
-            flow = recent_flow
-
-        top, bottom = find_all_matches(flow, all_data)
-
-        return jsonify({
-            "예측회차": round_num,
-            "상단값들": top,
-            "하단값들": bottom
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)})
-
 @app.route("/predict_top3_summary")
 def predict_top3_summary():
     try:
-        from itertools import chain
         response = supabase.table(SUPABASE_TABLE) \
             .select("*") \
             .order("reg_date", desc=True) \
@@ -124,34 +85,44 @@ def predict_top3_summary():
         raw = response.data
         all_data = [convert(d) for d in raw]
 
-        result = {}
+        transform_modes = {
+            "flip_full": flip_full,
+            "flip_start": flip_start,
+            "flip_odd_even": flip_odd_even
+        }
 
-        for size in [3, 4]:  # 3줄 + 4줄 블럭 포함
-            recent_block = all_data[:size]
-            transform_modes = {
-                "flip_full": flip_full,
-                "flip_start": flip_start,
-                "flip_odd_even": flip_odd_even
+        valid_values = {"좌3홀", "좌3짝", "우3홀", "우3짝"}
+        score_dict = {}
+
+        recent_block = all_data[:4]
+        for fn in transform_modes.values():
+            flow = fn(recent_block)
+            top, _ = find_all_matches(flow, all_data)
+            for idx, match in enumerate(top):
+                val = match["값"]
+                if val in valid_values:
+                    score = 10 - idx  # 순위 가중치
+                    score_dict[val] = score_dict.get(val, 0) + score
+
+        if len(score_dict) < 4:
+            return jsonify({"4줄 블럭 요약": {"예측그룹(3/4)": [], "❌ 제외값": "부족", "설명": "데이터 부족"}})
+
+        excluded = min(score_dict.items(), key=lambda x: x[1])[0]
+        filtered = {k: v for k, v in score_dict.items() if k != excluded}
+        sorted_top3 = sorted(filtered.items(), key=lambda x: x[1], reverse=True)
+
+        group = [f"{k}({v}점)" for k, v in sorted_top3]
+        excluded_score = f"{excluded}({score_dict[excluded]}점)"
+        max_score = max(filtered.values())
+        comment = "편중 경향 있음" if max_score >= sum(filtered.values()) * 0.6 else "분산되어 안정적"
+
+        return jsonify({
+            "4줄 블럭 요약": {
+                "예측그룹(3/4)": group,
+                "❌ 제외값": excluded_score,
+                "설명": comment
             }
-
-            top_values = []
-            bottom_values = []
-
-            for fn in transform_modes.values():
-                flow = fn(recent_block)
-                top, bottom = find_all_matches(flow, all_data)
-                top_values += [t["값"] for t in top if t["값"] != "❌ 없음"]
-                bottom_values += [b["값"] for b in bottom if b["값"] != "❌ 없음"]
-
-            top_counter = Counter(top_values)
-            bottom_counter = Counter(bottom_values)
-
-            result[f"{size}줄 블럭 Top3 요약"] = {
-                "Top3상단": [v[0] for v in top_counter.most_common(3)],
-                "Top3하단": [v[0] for v in bottom_counter.most_common(3)]
-            }
-
-        return jsonify(result)
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)})
