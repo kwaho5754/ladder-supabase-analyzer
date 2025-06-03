@@ -2,19 +2,18 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>4줄 블럭 예측 요약</title>
+  <title>4줄 블럭 75% 예측</title>
   <style>
-    body { font-family: 'Noto Sans KR', sans-serif; background: #f4f7ff; padding: 2rem; }
-    h1 { text-align: center; margin-bottom: 2rem; }
-    table { width: 100%; max-width: 800px; margin: auto; border-collapse: collapse; background: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
-    th, td { padding: 0.8rem; text-align: center; border-bottom: 1px solid #ddd; }
+    body { font-family: 'Noto Sans KR', sans-serif; background: #f0f4f8; padding: 2rem; }
+    h1 { text-align: center; margin-bottom: 1.5rem; }
+    table { width: 100%; max-width: 700px; margin: 0 auto; background: #fff; border-collapse: collapse; border-radius: 8px; overflow: hidden; box-shadow: 0 0 8px rgba(0,0,0,0.1); }
+    th, td { padding: 1rem; text-align: center; border-bottom: 1px solid #ddd; }
     th { background-color: #e8f0fe; font-weight: bold; }
-    tr:last-child td { border-bottom: none; }
-    .loading { text-align: center; color: #666; }
+    .comment { text-align: center; margin-top: 1rem; color: #333; font-weight: 500; }
   </style>
 </head>
 <body>
-  <h1>🔮 4줄 블럭 기반 75% 예측 요약</h1>
+  <h1>🔮 4줄 블럭 기반 75% 예측 결과</h1>
 
   <table>
     <thead>
@@ -25,9 +24,11 @@
       </tr>
     </thead>
     <tbody id="summary-body">
-      <tr><td class="loading" colspan="3">불러오는 중...</td></tr>
+      <tr><td colspan="3">불러오는 중...</td></tr>
     </tbody>
   </table>
+
+  <div class="comment" id="extra-comment"></div>
 
   <script>
     async function loadSummary() {
@@ -40,13 +41,13 @@
 
         const row = document.createElement("tr");
         row.innerHTML = `
-          <td>${(data["예측 그룹 (3/4)"] || []).join('<br>')}</td>
+          <td>${(data["예측 그룹 (3/4)"] || []).join("<br>")}</td>
           <td>${data["제외값"] || "-"}</td>
           <td>${data["설명"] || ""}</td>
         `;
         tbody.appendChild(row);
       } catch (e) {
-        document.getElementById("summary-body").innerHTML = `<tr><td colspan="3">예측 정보를 불러오지 못했습니다.</td></tr>`;
+        document.getElementById("summary-body").innerHTML = '<tr><td colspan="3">예측 데이터를 불러오지 못했습니다.</td></tr>';
       }
     }
 

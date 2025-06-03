@@ -1,4 +1,4 @@
-from flask import Flask, jsonify, request, send_from_directory
+from flask import Flask, jsonify, send_from_directory
 from flask_cors import CORS
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -18,68 +18,64 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 def convert(entry):
     side = '좌' if entry['start_point'] == 'LEFT' else '우'
-    count = str(entry['line_count'])
+    count = '삼' if entry['line_count'] == 3 else '사'
     oe = '짝' if entry['odd_even'] == 'EVEN' else '홀'
     return f"{side}{count}{oe}"
 
-def parse_block(s):
-    return s[0], s[1:-1], s[-1]
-
-def flip_full(block):
-    return [('우' if s == '좌' else '좌') + c + ('짝' if o == '홀' else '홀') for s, c, o in map(parse_block, block)]
-
-def find_all_matches(block, full_data):
-    matches = []
+def find_matching_predictions(block, data):
     block_len = len(block)
-
-    for i in reversed(range(len(full_data) - block_len)):
-        candidate = full_data[i:i + block_len]
+    predictions = []
+    for i in reversed(range(block_len, len(data))):
+        candidate = data[i-block_len:i]
         if candidate == block:
-            top_index = i - 1
-            if 0 <= top_index < len(full_data):
-                matches.append(full_data[top_index])
-
-    return matches[:10]  # 상위 10개 예측값만 수집
+            prev_index = i - block_len - 1
+            if 0 <= prev_index < len(data):
+                predictions.append(data[prev_index])
+    return predictions
 
 @app.route("/")
 def home():
     return send_from_directory(os.path.dirname(__file__), "index.html")
 
 @app.route("/predict_top3_summary")
-def predict_top3_summary():
+def predict_summary():
     try:
-        response = supabase.table(SUPABASE_TABLE) \
-            .select("*") \
-            .order("reg_date", desc=True) \
-            .order("date_round", desc=True) \
-            .limit(5000) \
+        response = supabase.table(SUPABASE_TABLE)\
+            .select("*")\
+            .order("reg_date", desc=True)\
+            .order("date_round", desc=True)\
+            .limit(5000)\
             .execute()
 
         raw = response.data
         all_data = [convert(d) for d in raw]
 
-        block = all_data[:3]  # 3줄 블럭로 변경
-        flow = block  # 정방향만 사용
+        recent_block = all_data[:4]  # 최근 4줄 블럭 기준
+        predictions = find_matching_predictions(recent_block, all_data)
 
-        predictions = find_all_matches(flow, all_data)
+        valid_set = {"좌삼짝", "우삼홀", "좌사홀", "우사짝"}
+        filtered = [p for p in predictions if p in valid_set]
 
-        valid_values = {"좌3홀", "좌3짝", "우3홀", "우3짝"}
-        filtered = [p for p in predictions if p in valid_values]
-
-        if len(set(filtered)) < 4:
-            return jsonify({"예측 그룹 (3/4)": [], "제외값": "부족", "설명": "데이터 부족"})
+        if len(set(filtered)) < 2:
+            return jsonify({
+                "예측 그룹 (3/4)": [],
+                "제외값": "데이터 부족",
+                "설명": "최근 4줄 블럭과 일치하는 과거 흐름 부족"
+            })
 
         counter = Counter(filtered)
-        excluded = min(counter.items(), key=lambda x: x[1])[0]
-        group = [k for k in counter if k != excluded]
+        if len(counter) < 4:
+            excluded = min(counter.items(), key=lambda x: x[1])[0]
+        else:
+            excluded = sorted(counter.items(), key=lambda x: x[1])[0][0]
 
-        result = {
-            "예측 그룹 (3/4)": [f"{k} ({counter[k]}회)" for k in group],
-            "제외값": f"{excluded} ({counter[excluded]}회)",
-            "설명": "3줄 블럭 기준 정방향 흐름 기반 예측"
-        }
+        group = [k for k in valid_set if k != excluded and k in counter]
 
-        return jsonify(result)
+        return jsonify({
+            "예측 그룹 (3/4)": [f"{g} ({counter[g]}회)" for g in group],
+            "제외값": f"{excluded} ({counter.get(excluded, 0)}회)",
+            "설명": "4줄 블럭 기준, 최근에서 과거로 정방향 매칭 → 가장 적은 1개 제외 방식"
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)})
