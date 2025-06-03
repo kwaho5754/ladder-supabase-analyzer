@@ -22,6 +22,18 @@ def convert(entry):
     oe = '짝' if entry['odd_even'] == 'EVEN' else '홀'
     return f"{side}{count}{oe}"
 
+def parse_block(s):
+    return s[0], s[1], s[2]
+
+def flip_full(block):
+    return [("우" if s == "좌" else "좌") + c + ("짝" if o == "홀" else "홀") for s, c, o in map(parse_block, block)]
+
+def flip_start(block):
+    return [("우" if s == "좌" else "좌") + c + o for s, c, o in map(parse_block, block)]
+
+def flip_odd_even(block):
+    return [s + c + ("짝" if o == "홀" else "홀") for s, c, o in map(parse_block, block)]
+
 def find_matching_predictions(block, data):
     block_len = len(block)
     predictions = []
@@ -49,32 +61,38 @@ def predict_summary():
 
         raw = response.data
         all_data = [convert(d) for d in raw]
+        recent_block = all_data[:4]  # 최근 4줄 블럭
 
-        recent_block = all_data[:4]  # 최근 4줄 블럭 기준
-        predictions = find_matching_predictions(recent_block, all_data)
+        blocks = {
+            "원본": recent_block,
+            "완전대칭": flip_full(recent_block),
+            "시작점반전": flip_start(recent_block),
+            "홀짝반전": flip_odd_even(recent_block)
+        }
+
+        total_predictions = []
+        for name, blk in blocks.items():
+            preds = find_matching_predictions(blk, all_data)
+            total_predictions.extend(preds)
 
         valid_set = {"좌삼짝", "우삼홀", "좌사홀", "우사짝"}
-        filtered = [p for p in predictions if p in valid_set]
+        filtered = [p for p in total_predictions if p in valid_set]
 
         if len(set(filtered)) < 2:
             return jsonify({
                 "예측 그룹 (3/4)": [],
                 "제외값": "데이터 부족",
-                "설명": "최근 4줄 블럭과 일치하는 과거 흐름 부족"
+                "설명": "4가지 방향 모두에서 유효한 예측값 부족"
             })
 
         counter = Counter(filtered)
-        if len(counter) < 4:
-            excluded = min(counter.items(), key=lambda x: x[1])[0]
-        else:
-            excluded = sorted(counter.items(), key=lambda x: x[1])[0][0]
-
+        excluded = sorted(counter.items(), key=lambda x: x[1])[0][0]
         group = [k for k in valid_set if k != excluded and k in counter]
 
         return jsonify({
             "예측 그룹 (3/4)": [f"{g} ({counter[g]}회)" for g in group],
             "제외값": f"{excluded} ({counter.get(excluded, 0)}회)",
-            "설명": "4줄 블럭 기준, 최근에서 과거로 정방향 매칭 → 가장 적은 1개 제외 방식"
+            "설명": "4줄 블럭 기준, 4방향(원본/대칭/시작반전/홀짝반전) 매칭 → 가장 적은 1개 제외 방식"
         })
 
     except Exception as e:
