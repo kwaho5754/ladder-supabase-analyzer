@@ -63,8 +63,8 @@ def find_all_matches(block, full_data):
     if not bottom_matches:
         bottom_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
 
-    top_matches = sorted(top_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:12]
-    bottom_matches = sorted(bottom_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:12]
+    top_matches = sorted(top_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
+    bottom_matches = sorted(bottom_matches, key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 99999)[:5]
 
     return top_matches, bottom_matches
 
@@ -82,7 +82,7 @@ def predict():
             .select("*") \
             .order("reg_date", desc=True) \
             .order("date_round", desc=True) \
-            .limit(3000) \
+            .limit(5000) \
             .execute()
 
         raw = response.data
