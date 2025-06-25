@@ -118,7 +118,7 @@ def predict_top3_summary():
             .select("*") \
             .order("reg_date", desc=True) \
             .order("date_round", desc=True) \
-            .limit(3000) \
+            .limit(7000) \
             .execute()
 
         raw = response.data
