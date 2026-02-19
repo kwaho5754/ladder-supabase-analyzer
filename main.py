@@ -16,62 +16,50 @@ SUPABASE_TABLE = os.environ.get("SUPABASE_TABLE", "ladder")
 
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 하루 회차(사용자 기준)
-DAY_ROUNDS = int(os.environ.get("DAY_ROUNDS", "282"))
-# "9일 이상 지난" 기준(기본 9일)
-OLD_DAYS_THRESHOLD = int(os.environ.get("OLD_DAYS_THRESHOLD", "9"))
-
-
 def convert(entry):
     side = '좌' if entry['start_point'] == 'LEFT' else '우'
     count = str(entry['line_count'])
     oe = '짝' if entry['odd_even'] == 'EVEN' else '홀'
     return f"{side}{count}{oe}"
 
-
 def parse_block(s):
     return s[0], s[1:-1], s[-1]
-
 
 def flip_full(block):
     return [('우' if s == '좌' else '좌') + c + ('짝' if o == '홀' else '홀') for s, c, o in map(parse_block, block)]
 
-
 def flip_start(block):
     return [s + ('4' if c == '3' else '3') + ('홀' if o == '짝' else '짝') for s, c, o in map(parse_block, block)]
-
 
 def flip_odd_even(block):
     return [('우' if s == '좌' else '좌') + ('4' if c == '3' else '3') + o for s, c, o in map(parse_block, block)]
 
-
-def _sort_by_seq_asc(matches):
-    # "순번"이 숫자인 것만 우선 정렬 (작을수록 최근)
-    return sorted(
-        matches,
-        key=lambda x: int(x["순번"]) if str(x.get("순번", "")).isdigit() else 999999999
-    )
-
+def _calc_stats(matches):
+    """matches: [{순번: int or '❌', ...}]"""
+    nums = [int(m["순번"]) for m in matches if str(m.get("순번", "")).isdigit()]
+    return {
+        "전체매칭수": len(nums),
+        "최대순번": max(nums) if nums else None,
+        "최소순번": min(nums) if nums else None,
+    }
 
 def find_all_matches(block, full_data):
     """
-    반환 정책:
-    - 최근 매칭 5개(순번 작은 것) 유지
-    - + 9일 이상 지난 매칭 중 "최근 5개" 추가
-      (즉, 오래된 것 중에서도 너무 과거가 아니라, 오래된 구간의 최신들)
-    - index.html 수정 없이도 리스트에 '구분' 필드로 구분 가능
+    - full_data(최근순 정렬된 데이터)에서 block과 완전히 동일한 구간을 모두 찾음
+    - 화면에는 '최근(순번 작은 것)' 기준 Top5만 보여주되,
+      응답에 전체 매칭 수/최대 순번을 함께 내려서 리밋/범위 이슈를 확실히 검증 가능하게 함
     """
-    top_matches = []
-    bottom_matches = []
+    top_matches_all = []
+    bottom_matches_all = []
     block_len = len(block)
 
-    # ✅ 마지막 시작 위치 1칸 누락 방지: +1
+    # ✅ 마지막 시작 위치 누락 방지: +1
     for i in reversed(range(len(full_data) - block_len + 1)):
         candidate = full_data[i:i + block_len]
         if candidate == block:
             top_index = i - 1
             top_pred = full_data[top_index] if top_index >= 0 else "❌ 없음"
-            top_matches.append({
+            top_matches_all.append({
                 "값": top_pred,
                 "블럭": ">".join(block),
                 "순번": i + 1
@@ -79,65 +67,38 @@ def find_all_matches(block, full_data):
 
             bottom_index = i + block_len
             bottom_pred = full_data[bottom_index] if bottom_index < len(full_data) else "❌ 없음"
-            bottom_matches.append({
+            bottom_matches_all.append({
                 "값": bottom_pred,
                 "블럭": ">".join(block),
                 "순번": i + 1
             })
 
-    # 매칭 자체가 없으면 기존대로
-    if not top_matches:
-        top_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
-    if not bottom_matches:
-        bottom_matches.append({"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"})
+    # 통계는 "전체 매칭" 기준으로 계산
+    top_stats = _calc_stats(top_matches_all)
+    bottom_stats = _calc_stats(bottom_matches_all)
 
-    # ---- 여기부터 "표시 로직" 변경 ----
-    min_seq_for_old = DAY_ROUNDS * OLD_DAYS_THRESHOLD  # 예: 282 * 9 = 2538
+    # 표시용(최근부터) Top5: 순번 작은 것(최근) 우선
+    if not top_matches_all:
+        top_display = [{"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"}]
+    else:
+        top_display = sorted(
+            top_matches_all,
+            key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 999999999
+        )[:5]
 
-    def build_display(matches, label_recent="최근", label_old="9일+"):
-        # 숫자 순번만 추려서 정렬
-        digit_matches = [m for m in matches if str(m.get("순번", "")).isdigit()]
-        digit_matches = _sort_by_seq_asc(digit_matches)
+    if not bottom_matches_all:
+        bottom_display = [{"값": "❌ 없음", "블럭": ">".join(block), "순번": "❌"}]
+    else:
+        bottom_display = sorted(
+            bottom_matches_all,
+            key=lambda x: int(x["순번"]) if str(x["순번"]).isdigit() else 999999999
+        )[:5]
 
-        # 최근 5개 (순번 작은 것)
-        recent = digit_matches[:5]
-
-        # 9일 이상 지난 것 중 "최근 5개"
-        old_pool = [m for m in digit_matches if int(m["순번"]) >= min_seq_for_old]
-        old_recent = old_pool[:5]  # 오래된 구간에서도 '최근'부터
-
-        # 구분 태그 추가 (index.html 수정 없이도 구분 가능)
-        recent_tagged = []
-        for m in recent:
-            mm = dict(m)
-            mm["구분"] = label_recent
-            recent_tagged.append(mm)
-
-        old_tagged = []
-        for m in old_recent:
-            mm = dict(m)
-            mm["구분"] = label_old
-            old_tagged.append(mm)
-
-        # 최근 먼저 + 오래된(9일+) 다음
-        combined = recent_tagged + old_tagged
-
-        # 만약 숫자 순번이 하나도 없으면(방어)
-        if not combined:
-            return matches[:5]
-
-        return combined
-
-    top_display = build_display(top_matches, label_recent="최근", label_old=f"{OLD_DAYS_THRESHOLD}일+")
-    bottom_display = build_display(bottom_matches, label_recent="최근", label_old=f"{OLD_DAYS_THRESHOLD}일+")
-
-    return top_display, bottom_display
-
+    return top_display, bottom_display, top_stats, bottom_stats
 
 @app.route("/")
 def home():
     return send_from_directory(os.path.dirname(__file__), "index.html")
-
 
 @app.route("/predict")
 def predict():
@@ -153,6 +114,9 @@ def predict():
             .execute()
 
         raw = response.data
+        if not raw:
+            return jsonify({"error": "데이터가 없습니다."})
+
         round_num = int(raw[0]["date_round"]) + 1
         all_data = [convert(d) for d in raw]
         recent_flow = all_data[:size]
@@ -166,17 +130,30 @@ def predict():
         else:
             flow = recent_flow
 
-        top, bottom = find_all_matches(flow, all_data)
+        top, bottom, top_stats, bottom_stats = find_all_matches(flow, all_data)
 
         return jsonify({
             "예측회차": round_num,
+
+            # ✅ 리밋이 진짜 적용됐는지 증거
+            "조회건수": len(raw),
+
+            # ✅ '왜 900대에서 멈춰 보이냐'를 증거로 확인
+            "상단_전체매칭수": top_stats["전체매칭수"],
+            "상단_최대순번": top_stats["최대순번"],
+            "상단_최소순번": top_stats["최소순번"],
+
+            "하단_전체매칭수": bottom_stats["전체매칭수"],
+            "하단_최대순번": bottom_stats["최대순번"],
+            "하단_최소순번": bottom_stats["최소순번"],
+
+            # 표시용(최근 Top5)
             "상단값들": top,
             "하단값들": bottom
         })
 
     except Exception as e:
         return jsonify({"error": str(e)})
-
 
 @app.route("/predict_top3_summary")
 def predict_top3_summary():
@@ -189,8 +166,10 @@ def predict_top3_summary():
             .execute()
 
         raw = response.data
-        all_data = [convert(d) for d in raw]
+        if not raw:
+            return jsonify({"error": "데이터가 없습니다."})
 
+        all_data = [convert(d) for d in raw]
         result = {}
 
         for size in [3, 4]:  # 3줄 + 4줄 블럭 포함
@@ -206,11 +185,10 @@ def predict_top3_summary():
 
             for fn in transform_modes.values():
                 flow = fn(recent_block)
-                top, bottom = find_all_matches(flow, all_data)
+                top, bottom, _, _ = find_all_matches(flow, all_data)
 
-                # top/bottom에 "구분" 필드가 들어가도 값만 뽑으면 됨
-                top_values += [t.get("값") for t in top if t.get("값") != "❌ 없음"]
-                bottom_values += [b.get("값") for b in bottom if b.get("값") != "❌ 없음"]
+                top_values += [t["값"] for t in top if t.get("값") != "❌ 없음"]
+                bottom_values += [b["값"] for b in bottom if b.get("값") != "❌ 없음"]
 
             top_counter = Counter(top_values)
             bottom_counter = Counter(bottom_values)
@@ -220,11 +198,13 @@ def predict_top3_summary():
                 "Top3하단": [v[0] for v in bottom_counter.most_common(3)]
             }
 
-        return jsonify(result)
+        return jsonify({
+            "조회건수": len(raw),
+            "요약": result
+        })
 
     except Exception as e:
         return jsonify({"error": str(e)})
-
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT") or 5000)
